@@ -1,10 +1,16 @@
 using SpotMe.Web.Components;
+using SpotMe.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+// Register Spotify services
+builder.Services.AddScoped<SpotifyAuthService>();
+builder.Services.AddScoped<SpotifyPlayerService>();
+builder.Services.AddHttpClient();
 
 var app = builder.Build();
 

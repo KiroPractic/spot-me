@@ -21,3 +21,18 @@
     <a href="" class="reload">Reload</a>
     <a class="dismiss">🗙</a>
 </div>
+
+@code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+        
+        if (firstRender)
+        {
+            // This will ensure scripts are loaded only once
+            await JSRuntime.InvokeVoidAsync("eval", "if (!window.spotifyScriptLoaded) { window.spotifyScriptLoaded = true; var script = document.createElement('script'); script.src = 'https://sdk.scdn.co/spotify-player.js'; document.body.appendChild(script); }");
+        }
+    }
+}
+
+@inject IJSRuntime JSRuntime
