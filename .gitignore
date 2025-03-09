@@ -1,0 +1,27 @@
+# .NET Core
+bin/
+obj/
+*.dll
+*.pdb
+*.user
+*.log
+*.vs/
+*.vscode/
+*.suo
+*.cache
+*.csproj.user
+*.userprefs
+project.lock.json
+artifacts/
+
+# IDE specific files
+.idea/
+.DS_Store
+Thumbs.db
+
+# Docker volumes
+postgres_data/
+smtp4dev_data/
+
+# Environment settings
+.env

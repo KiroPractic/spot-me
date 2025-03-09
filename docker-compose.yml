@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  # PostgreSQL database
+  postgres:
+    image: postgres:15
+    container_name: spotme-postgres
+    environment:
+      POSTGRES_USER: spotme
+      POSTGRES_PASSWORD: spotme_password
+      POSTGRES_DB: spotme_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # SMTP server for development
+  smtp4dev:
+    image: rnwood/smtp4dev
+    container_name: spotme-smtp4dev
+    ports:
+      - "3000:80"    # Web interface
+      - "25:25"      # SMTP port
+    environment:
+      - ServerOptions__BasePath=/
+    volumes:
+      - smtp4dev_data:/smtp4dev
+
+  # .NET SDK for development
+  dotnet-sdk:
+    image: mcr.microsoft.com/dotnet/sdk:8.0
+    container_name: spotme-dotnet-sdk
+    volumes:
+      - .:/app
+    working_dir: /app/Source
+    ports:
+      - "5000:5000"  # ASP.NET Core port
+      - "5001:5001"  # ASP.NET Core HTTPS port
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:5000
+    tty: true
+    stdin_open: true
+    # Keep container running
+    command: tail -f /dev/null
+
+volumes:
+  postgres_data:
+  smtp4dev_data:
