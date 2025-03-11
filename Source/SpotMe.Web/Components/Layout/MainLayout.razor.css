@@ -1,96 +1,189 @@
-.page {
-    position: relative;
+/* Main layout styling */
+.app-layout {
     display: flex;
     flex-direction: column;
+    height: 100vh;
+    width: 100%;
 }
 
-main {
+.main-content {
     flex: 1;
+    overflow-y: auto;
+    background-color: #121212;
+    color: #fff;
+    transition: padding-top 0.3s ease;
 }
 
-.sidebar {
-    background-image: linear-gradient(180deg, rgb(5, 39, 103) 0%, #3a0647 70%);
+/* When navbar is shown */
+.main-content.with-navbar {
+    padding-top: 60px;
 }
 
-.top-row {
-    background-color: #f7f7f7;
-    border-bottom: 1px solid #d6d5d5;
-    justify-content: flex-end;
-    height: 3.5rem;
+/* Top navbar styling */
+.top-navbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background-color: #121212;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    z-index: 1000;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.navbar-brand {
+    display: flex;
+    align-items: center;
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.spotify-icon {
+    color: #1DB954;
+    font-size: 1.75rem;
+    margin-right: 10px;
+}
+
+.nav-links {
+    display: flex;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.nav-links li {
+    margin: 0 5px;
+}
+
+.nav-links a {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    color: #b3b3b3;
+    text-decoration: none;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.nav-links a:hover {
+    color: #fff;
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.nav-links li.active a {
+    color: #fff;
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.nav-links i {
+    margin-right: 8px;
+}
+
+/* User section in navbar */
+.user-section {
     display: flex;
     align-items: center;
 }
 
-    .top-row ::deep a, .top-row ::deep .btn-link {
-        white-space: nowrap;
-        margin-left: 1.5rem;
-        text-decoration: none;
-    }
-
-    .top-row ::deep a:hover, .top-row ::deep .btn-link:hover {
-        text-decoration: underline;
-    }
-
-    .top-row ::deep a:first-child {
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-
-@media (max-width: 640.98px) {
-    .top-row {
-        justify-content: space-between;
-    }
-
-    .top-row ::deep a, .top-row ::deep .btn-link {
-        margin-left: 0;
-    }
+.user-profile {
+    display: flex;
+    align-items: center;
+    margin-right: 15px;
 }
 
-@media (min-width: 641px) {
-    .page {
-        flex-direction: row;
-    }
-
-    .sidebar {
-        width: 250px;
-        height: 100vh;
-        position: sticky;
-        top: 0;
-    }
-
-    .top-row {
-        position: sticky;
-        top: 0;
-        z-index: 1;
-    }
-
-    .top-row.auth ::deep a:first-child {
-        flex: 1;
-        text-align: right;
-        width: 0;
-    }
-
-    .top-row, article {
-        padding-left: 2rem !important;
-        padding-right: 1.5rem !important;
-    }
+.profile-img {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-right: 10px;
 }
 
+.profile-icon {
+    font-size: 24px;
+    color: #b3b3b3;
+    margin-right: 10px;
+}
+
+.username {
+    color: #fff;
+    font-weight: 500;
+}
+
+.logout-btn {
+    background-color: transparent;
+    border: 1px solid #333;
+    color: #b3b3b3;
+    display: flex;
+    align-items: center;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.logout-btn:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #fff;
+}
+
+.logout-btn i {
+    margin-right: 6px;
+}
+
+/* Error UI styling */
 #blazor-error-ui {
-    background: lightyellow;
+    background-color: #ff5252;
+    color: white;
     bottom: 0;
-    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 -2px 20px rgba(0,0,0,.2);
     display: none;
     left: 0;
-    padding: 0.6rem 1.25rem 0.7rem 1.25rem;
+    padding: 1rem;
     position: fixed;
     width: 100%;
     z-index: 1000;
 }
 
-    #blazor-error-ui .dismiss {
-        cursor: pointer;
-        position: absolute;
-        right: 0.75rem;
-        top: 0.5rem;
+#blazor-error-ui .reload {
+    color: white;
+    margin-left: 1rem;
+    text-decoration: underline;
+}
+
+#blazor-error-ui .dismiss {
+    cursor: pointer;
+    margin-left: 1rem;
+    position: absolute;
+    right: 1rem;
+    top: 1rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .nav-links span {
+        display: none;
     }
+    
+    .nav-links i {
+        margin-right: 0;
+        font-size: 1.2rem;
+    }
+    
+    .username {
+        display: none;
+    }
+    
+    .logout-btn span {
+        display: none;
+    }
+    
+    .logout-btn i {
+        margin-right: 0;
+    }
+}

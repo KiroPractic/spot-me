@@ -1,0 +1,84 @@
+@page "/auth"
+@using SpotMe.Web.Services
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+@inject SpotifyAuthService AuthService
+@rendermode InteractiveServer
+
+<PageTitle>SpotMe - Login</PageTitle>
+
+<div class="dark-container">
+    <div class="spotify-content">
+        <h1>SpotMe</h1>
+        <p class="tagline">Your personal Spotify player experience</p>
+        
+        <button @onclick="AuthenticateWithSpotify" class="spotify-button">
+            <i class="bi bi-spotify"></i> Connect with Spotify
+        </button>
+        
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="error-message">@errorMessage</div>
+        }
+    </div>
+</div>
+
+@code {
+    private string? errorMessage;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try 
+            {
+                // Check if user is already authenticated
+                var token = await AuthService.GetAccessTokenAsync();
+                
+                if (!string.IsNullOrEmpty(token))
+                {
+                    // Already authenticated, redirect to home
+                    NavigationManager.NavigateTo("/");
+                }
+            }
+            catch (Exception ex)
+            {
+                await JSRuntime.InvokeVoidAsync("console.error", $"Error checking authentication: {ex.Message}");
+                errorMessage = $"Error: {ex.Message}";
+            }
+        }
+    }
+    
+    private async Task AuthenticateWithSpotify()
+    {
+        try
+        {
+            // Log that we're starting authentication
+            await JSRuntime.InvokeVoidAsync("console.log", "Starting Spotify authentication...");
+            
+            // Configure the auth service with your client ID and redirect URI
+            var redirectUri = NavigationManager.BaseUri.TrimEnd('/') + "/callback";
+            await JSRuntime.InvokeVoidAsync("console.log", $"Using redirect URI: {redirectUri}");
+            AuthService.Configure("6bf1083c60b743a9841b7db2ca63117b", redirectUri);
+            
+            // Generate the auth URL and redirect
+            var authUrl = await AuthService.GenerateAuthUrlAsync();
+            
+            // Log the URL we're navigating to (but mask the client ID for security)
+            var maskedUrl = !string.IsNullOrEmpty(AuthService.ClientId) ? authUrl.Replace(AuthService.ClientId, "[CLIENT_ID]") : authUrl;
+            await JSRuntime.InvokeVoidAsync("console.log", $"Navigating to auth URL: {maskedUrl}");
+            
+            // Log the requested scopes
+            await JSRuntime.InvokeVoidAsync("console.log", $"Requested scopes: {AuthService.RequestedScopes}");
+            
+            // Use a safe redirect approach
+            await JSRuntime.InvokeVoidAsync("eval", $"setTimeout(function() {{ window.location.href = '{authUrl.Replace("'", "\\'")}'; }}, 100);");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Authentication error: {ex.Message}");
+            errorMessage = $"Error: {ex.Message}";
+            StateHasChanged();
+        }
+    }
+}

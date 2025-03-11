@@ -1,4 +1,7 @@
-﻿<!DOCTYPE html>
+﻿@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.AspNetCore.Components.Routing
+
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -18,7 +21,26 @@
 </head>
 
 <body>
-    <Routes />
+    <Router AppAssembly="@typeof(Program).Assembly">
+        <Found Context="routeData">
+            <RouteView RouteData="@routeData" DefaultLayout="@typeof(Layout.MainLayout)" />
+            <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+        </Found>
+        <NotFound>
+            <PageTitle>Not Found - SpotMe</PageTitle>
+            <LayoutView Layout="@typeof(Layout.MainLayout)">
+                <div class="dark-container">
+                    <div class="spotify-content">
+                        <h1>404</h1>
+                        <p class="tagline">Page not found</p>
+                        <a href="/" class="spotify-button">
+                            <i class="bi bi-house"></i> Go Home
+                        </a>
+                    </div>
+                </div>
+            </LayoutView>
+        </NotFound>
+    </Router>
     <script src="_framework/blazor.web.js"></script>
 </body>
 

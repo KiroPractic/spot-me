@@ -1,8 +1,65 @@
 ﻿@inherits LayoutComponentBase
+@using SpotMe.Web.Services
+@using System.Diagnostics
+@implements IDisposable
 @inject IJSRuntime JSRuntime
+@inject SpotifyAuthService AuthService
+@inject NavigationManager NavigationManager
 
-<div class="app-container">
-    @Body
+<div class="app-layout">
+    @if (isAuthenticated)
+    {
+        <nav class="top-navbar">
+            <div class="navbar-brand">
+                <i class="bi bi-spotify spotify-icon"></i>
+                <span>SpotMe</span>
+            </div>
+            
+            <ul class="nav-links">
+                <li class="@GetActiveClass("/")">
+                    <a href="/">
+                        <i class="bi bi-house-door"></i>
+                        <span>Home</span>
+                    </a>
+                </li>
+                <li class="@GetActiveClass("/search")">
+                    <a href="/search">
+                        <i class="bi bi-search"></i>
+                        <span>Search</span>
+                    </a>
+                </li>
+                <li class="@GetActiveClass("/playlists")">
+                    <a href="/playlists">
+                        <i class="bi bi-music-note-list"></i>
+                        <span>Playlists</span>
+                    </a>
+                </li>
+            </ul>
+            
+            <div class="user-section">
+                <div class="user-profile">
+                    @if (!string.IsNullOrEmpty(userProfile?.ImageUrl))
+                    {
+                        <img src="@userProfile.ImageUrl" alt="@userProfile.DisplayName" class="profile-img" />
+                    }
+                    else
+                    {
+                        <i class="bi bi-person-circle profile-icon"></i>
+                    }
+                    <span class="username">@(userProfile?.DisplayName ?? "User")</span>
+                </div>
+                
+                <button @onclick="HandleLogout" class="logout-btn">
+                    <i class="bi bi-box-arrow-right"></i>
+                    <span>Logout</span>
+                </button>
+            </div>
+        </nav>
+    }
+    
+    <main class="main-content @(isAuthenticated ? "with-navbar" : "")">
+        @Body
+    </main>
 </div>
 
 <div id="blazor-error-ui">
@@ -12,6 +69,98 @@
 </div>
 
 @code {
+    private bool isAuthenticated = false;
+    private UserProfile? userProfile;
+
+    // Listen for navigation events to check authentication on every navigation
+    protected override void OnInitialized()
+    {
+        NavigationManager.LocationChanged += OnLocationChanged;
+    }
+
+    private async void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        // Check auth status on every navigation
+        await CheckAuthenticationStatus();
+    }
+
+    // Clean up event handler when component is disposed
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= OnLocationChanged;
+    }
+
+    // Add an initialization method to check auth status early
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckAuthenticationStatus();
+    }
+    
+    private async Task CheckAuthenticationStatus()
+    {
+        try
+        {
+            // Get the access token from the service
+            var token = await AuthService.GetAccessTokenAsync();
+            
+            // Check if we have a valid token
+            var wasAuthenticated = isAuthenticated;
+            isAuthenticated = !string.IsNullOrEmpty(token);
+            
+            // Only update profile if authentication state changed or we don't have a profile yet
+            if (isAuthenticated && (wasAuthenticated != isAuthenticated || userProfile == null))
+            {
+                // Fetch the user profile from Spotify
+                var spotifyProfile = await AuthService.GetUserProfileAsync();
+                
+                if (spotifyProfile != null)
+                {
+                    await JSRuntime.InvokeVoidAsync("console.log", $"MainLayout received profile - DisplayName: '{spotifyProfile.DisplayName}', Email: '{spotifyProfile.Email}'");
+                    
+                    // Extract display name, with fallback
+                    string displayName = !string.IsNullOrEmpty(spotifyProfile.DisplayName) 
+                        ? spotifyProfile.DisplayName 
+                        : (!string.IsNullOrEmpty(spotifyProfile.Email) ? spotifyProfile.Email : "Spotify User");
+                    
+                    userProfile = new UserProfile
+                    {
+                        DisplayName = displayName,
+                        Email = spotifyProfile.Email,
+                        ImageUrl = spotifyProfile.Images?.FirstOrDefault()?.Url
+                    };
+                    
+                    Console.WriteLine($"Fetched user profile: {displayName}");
+                    await JSRuntime.InvokeVoidAsync("console.log", $"User authenticated: {isAuthenticated}, Profile: {displayName}");
+                }
+                else
+                {
+                    // Fallback to default values
+                    userProfile = new UserProfile
+                    {
+                        DisplayName = "Spotify User",
+                        Email = "user@example.com"
+                    };
+                    
+                    Console.WriteLine("Failed to get Spotify profile");
+                }
+            }
+            
+            // Force a UI update since this might be called from an event handler
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error checking authentication: {ex.Message}");
+            
+            // Fallback to default values if needed
+            userProfile = new UserProfile
+            {
+                DisplayName = "Spotify User",
+                Email = "user@example.com"
+            };
+        }
+    }
+    
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         await base.OnAfterRenderAsync(firstRender);
@@ -20,7 +169,19 @@
         {
             try
             {
-                // Add a check to see if we already have Spotify scripts loaded
+                // JS code is now safe to run
+                await JSRuntime.InvokeVoidAsync("console.log", $"Layout rendered, authenticated: {isAuthenticated}");
+                
+                // If the token is stored in localStorage but we didn't detect it during server-side rendering,
+                // check auth status again now that we can use JS interop
+                await CheckAuthenticationStatus();
+                
+                if (userProfile != null)
+                {
+                    await JSRuntime.InvokeVoidAsync("console.log", $"User profile: {userProfile.DisplayName}");
+                }
+                
+                // Add Spotify SDK loading logic
                 await JSRuntime.InvokeVoidAsync("eval", @"
                     // Define global namespace for SpotMe app
                     window.SpotMe = window.SpotMe || {};
@@ -57,8 +218,35 @@
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"Error loading Spotify SDK: {ex.Message}");
+                Console.Error.WriteLine($"Error in MainLayout: {ex.Message}");
             }
         }
+    }
+    
+    private string GetActiveClass(string path)
+    {
+        var currentPath = NavigationManager.Uri.Split('?')[0];
+        if (path == "/" && currentPath.EndsWith("/"))
+            return "active";
+            
+        return currentPath.Contains(path) ? "active" : "";
+    }
+    
+    private async Task HandleLogout()
+    {
+        await AuthService.ClearAccessTokenAsync();
+        isAuthenticated = false;
+        StateHasChanged();
+        
+        // Navigate to login page
+        NavigationManager.NavigateTo("/auth");
+    }
+    
+    // Simple user profile model - we'll expand this later
+    public class UserProfile
+    {
+        public string? DisplayName { get; set; }
+        public string? Email { get; set; }
+        public string? ImageUrl { get; set; }
     }
 }

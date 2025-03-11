@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.JSInterop;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 
@@ -14,8 +15,12 @@ public class SpotifyAuthService
     private string? _accessToken;
     private DateTime _tokenExpiry = DateTime.MinValue;
 
-    // Spotify requires these scopes to use the Web Playback SDK
-    private const string _requiredScopes = "streaming user-read-email user-read-private user-read-playback-state user-modify-playback-state";
+    // Spotify requires these scopes to use the Web Playback SDK and access library
+    private const string _requiredScopes = "streaming user-read-email user-read-private user-read-playback-state user-modify-playback-state user-library-read user-follow-read playlist-read-private playlist-read-collaborative";
+    
+    // Properties to expose for debugging
+    public string? ClientId => _clientId;
+    public string RequestedScopes => _requiredScopes;
 
     public SpotifyAuthService(IJSRuntime jsRuntime, HttpClient httpClient)
     {
@@ -43,11 +48,11 @@ public class SpotifyAuthService
         await _jsRuntime.InvokeVoidAsync("localStorage.setItem", "spotify_auth_state", state);
 
         // Build the Spotify authorization URL
-        var queryParams = new Dictionary<string, string>
+        var queryParams = new Dictionary<string, string?>
         {
-            { "client_id", _clientId },
+            { "client_id", _clientId! },
             { "response_type", "token" },
-            { "redirect_uri", _redirectUri },
+            { "redirect_uri", _redirectUri! },
             { "scope", _requiredScopes },
             { "state", state },
             { "show_dialog", "true" }
@@ -66,11 +71,11 @@ public class SpotifyAuthService
         _ = _jsRuntime.InvokeVoidAsync("localStorage.setItem", "spotify_auth_state", state);
 
         // Build the Spotify authorization URL
-        var queryParams = new Dictionary<string, string>
+        var queryParams = new Dictionary<string, string?>
         {
-            { "client_id", _clientId },
+            { "client_id", _clientId! },
             { "response_type", "token" },
-            { "redirect_uri", _redirectUri },
+            { "redirect_uri", _redirectUri! },
             { "scope", _requiredScopes },
             { "state", state },
             { "show_dialog", "true" }
@@ -175,42 +180,84 @@ public class SpotifyAuthService
     {
         try
         {
-            // If we have a valid token, return it
+            // If we have a valid token in memory, return it
             if (!string.IsNullOrEmpty(_accessToken) && DateTime.UtcNow < _tokenExpiry)
             {
+                await _jsRuntime.InvokeVoidAsync("console.log", "Using in-memory token");
                 return _accessToken;
             }
 
             // Try to get the token from local storage - handle prerendering case
             try
             {
+                // Log that we're checking localStorage
+                await _jsRuntime.InvokeVoidAsync("console.log", "Checking localStorage for token");
+                
+                // Debug what's in localStorage
+                var debugScript = @"
+                    let token = localStorage.getItem('spotify_access_token');
+                    let expiry = localStorage.getItem('spotify_token_expiry');
+                    console.log('localStorage check - token exists:', !!token);
+                    if (token) console.log('token starts with:', token.substring(0, 10) + '...');
+                    console.log('localStorage check - expiry exists:', !!expiry);
+                    if (expiry) console.log('expiry:', expiry);
+                ";
+                await _jsRuntime.InvokeVoidAsync("eval", debugScript);
+                
                 var storedToken = await _jsRuntime.InvokeAsync<string>("localStorage.getItem", "spotify_access_token");
                 var storedExpiryStr = await _jsRuntime.InvokeAsync<string>("localStorage.getItem", "spotify_token_expiry");
 
                 if (!string.IsNullOrEmpty(storedToken) && !string.IsNullOrEmpty(storedExpiryStr))
                 {
-                    if (DateTime.TryParse(storedExpiryStr, out var storedExpiry) && DateTime.UtcNow < storedExpiry)
+                    await _jsRuntime.InvokeVoidAsync("console.log", $"Found token in localStorage, checking validity");
+                    
+                    if (DateTime.TryParse(storedExpiryStr, out var storedExpiry))
                     {
-                        _accessToken = storedToken;
-                        _tokenExpiry = storedExpiry;
-                        return _accessToken;
+                        await _jsRuntime.InvokeVoidAsync("console.log", $"Token expiry: {storedExpiry}, Now: {DateTime.UtcNow}");
+                        
+                        if (DateTime.UtcNow < storedExpiry)
+                        {
+                            _accessToken = storedToken;
+                            _tokenExpiry = storedExpiry;
+                            await _jsRuntime.InvokeVoidAsync("console.log", "Using valid token from localStorage");
+                            return _accessToken;
+                        }
+                        else
+                        {
+                            await _jsRuntime.InvokeVoidAsync("console.log", "Token expired");
+                        }
+                    }
+                    else
+                    {
+                        await _jsRuntime.InvokeVoidAsync("console.log", $"Invalid expiry format: {storedExpiryStr}");
                     }
                 }
+                else
+                {
+                    await _jsRuntime.InvokeVoidAsync("console.log", "No token found in localStorage");
+                }
             }
-            catch (InvalidOperationException)
+            catch (InvalidOperationException ex)
             {
                 // This happens during prerendering - just return null
                 // We'll check again in OnAfterRenderAsync
+                await _jsRuntime.InvokeVoidAsync("console.log", $"JS interop error during GetAccessTokenAsync: {ex.Message}");
                 return null;
+            }
+            catch (Exception ex)
+            {
+                await _jsRuntime.InvokeVoidAsync("console.error", $"Error accessing localStorage: {ex.Message}");
             }
 
             // We need a new token via OAuth flow
+            await _jsRuntime.InvokeVoidAsync("console.log", "No valid token found, needs OAuth flow");
             return null;
         }
         catch (Exception ex)
         {
             // Log exception but don't crash
             Console.Error.WriteLine($"Error getting access token: {ex.Message}");
+            await _jsRuntime.InvokeVoidAsync("console.error", $"Error in GetAccessTokenAsync: {ex.Message}");
             return null;
         }
     }
@@ -220,9 +267,28 @@ public class SpotifyAuthService
         _accessToken = accessToken;
         _tokenExpiry = DateTime.UtcNow.AddSeconds(expiresIn);
 
-        // Store in local storage
-        await _jsRuntime.InvokeVoidAsync("localStorage.setItem", "spotify_access_token", accessToken);
-        await _jsRuntime.InvokeVoidAsync("localStorage.setItem", "spotify_token_expiry", _tokenExpiry.ToString("o"));
+        try
+        {
+            // Add debug info
+            await _jsRuntime.InvokeVoidAsync("console.log", $"Storing token in localStorage (expires in {expiresIn}s)");
+            
+            // Store in local storage
+            await _jsRuntime.InvokeVoidAsync("localStorage.setItem", "spotify_access_token", accessToken);
+            await _jsRuntime.InvokeVoidAsync("localStorage.setItem", "spotify_token_expiry", _tokenExpiry.ToString("o"));
+            
+            // Verify it was stored correctly
+            var verifyToken = await _jsRuntime.InvokeAsync<string>("localStorage.getItem", "spotify_access_token");
+            var verifyExpiry = await _jsRuntime.InvokeAsync<string>("localStorage.getItem", "spotify_token_expiry");
+            
+            await _jsRuntime.InvokeVoidAsync("console.log", $"Verified localStorage: token exists = {!string.IsNullOrEmpty(verifyToken)}, expiry exists = {!string.IsNullOrEmpty(verifyExpiry)}");
+            
+            // Update IsAuthenticated property
+            await _jsRuntime.InvokeVoidAsync("console.log", $"Updated authentication state: {IsAuthenticated}");
+        }
+        catch (Exception ex)
+        {
+            await _jsRuntime.InvokeVoidAsync("console.error", $"Error storing token: {ex.Message}");
+        }
     }
 
     public async Task ClearAccessTokenAsync()
@@ -235,4 +301,225 @@ public class SpotifyAuthService
     }
 
     public bool IsAuthenticated => !string.IsNullOrEmpty(_accessToken) && DateTime.UtcNow < _tokenExpiry;
+    
+    public async Task<SpotifyUserProfile?> GetUserProfileAsync()
+    {
+        var token = await GetAccessTokenAsync();
+        if (string.IsNullOrEmpty(token))
+        {
+            await _jsRuntime.InvokeVoidAsync("console.error", "GetUserProfileAsync: No access token available");
+            return null;
+        }
+        
+        try 
+        {
+            await _jsRuntime.InvokeVoidAsync("console.log", "Requesting user profile from Spotify API...");
+            
+            // Create a new request to the Spotify API
+            var request = new HttpRequestMessage(HttpMethod.Get, "https://api.spotify.com/v1/me");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            
+            var response = await _httpClient.SendAsync(request);
+            await _jsRuntime.InvokeVoidAsync("console.log", $"User profile response status: {response.StatusCode}");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                
+                // Log the raw JSON for debugging
+                await _jsRuntime.InvokeVoidAsync("console.log", "Raw profile JSON:", content);
+                
+                var options = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                };
+                
+                var profile = JsonSerializer.Deserialize<SpotifyUserProfile>(content, options);
+                
+                if (profile != null)
+                {
+                    await _jsRuntime.InvokeVoidAsync("console.log", $"Parsed profile - DisplayName: '{profile.DisplayName}', Email: '{profile.Email}'");
+                    
+                    if (profile.Images != null && profile.Images.Count > 0)
+                    {
+                        await _jsRuntime.InvokeVoidAsync("console.log", $"Found {profile.Images.Count} profile images, first URL: {profile.Images[0].Url}");
+                    }
+                    else
+                    {
+                        await _jsRuntime.InvokeVoidAsync("console.log", "No profile images found");
+                    }
+                }
+                else
+                {
+                    await _jsRuntime.InvokeVoidAsync("console.error", "Failed to deserialize profile");
+                }
+                
+                return profile;
+            }
+            
+            // Handle error cases
+            var errorContent = await response.Content.ReadAsStringAsync();
+            await _jsRuntime.InvokeVoidAsync("console.error", $"Failed to get user profile: {response.StatusCode}");
+            await _jsRuntime.InvokeVoidAsync("console.error", $"Error details: {errorContent}");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            await _jsRuntime.InvokeVoidAsync("console.error", $"Error getting user profile: {ex.Message}");
+            await _jsRuntime.InvokeVoidAsync("console.error", $"Stack trace: {ex.StackTrace}");
+            return null;
+        }
+    }
+    
+    // Get user's saved tracks (liked songs) count
+    public async Task<int> GetSavedTracksCountAsync()
+    {
+        var token = await GetAccessTokenAsync();
+        if (string.IsNullOrEmpty(token))
+        {
+            return 0;
+        }
+        
+        try 
+        {
+            // Log access token for debugging (truncated for security)
+            if (token.Length > 10)
+            {
+                await _jsRuntime.InvokeVoidAsync("console.log", $"Using token starting with: {token.Substring(0, 10)}...");
+            }
+            
+            // We only need the total count, so limit=1 is sufficient
+            var request = new HttpRequestMessage(HttpMethod.Get, "https://api.spotify.com/v1/me/tracks?limit=1");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            
+            // Log that we're making the request
+            await _jsRuntime.InvokeVoidAsync("console.log", "Requesting saved tracks from Spotify API...");
+            
+            var response = await _httpClient.SendAsync(request);
+            
+            // Log the response status
+            await _jsRuntime.InvokeVoidAsync("console.log", $"Saved tracks response status: {response.StatusCode}");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                var paginatedResponse = JsonSerializer.Deserialize<PaginatedResponse>(content, options);
+                
+                await _jsRuntime.InvokeVoidAsync("console.log", $"Retrieved saved tracks count: {paginatedResponse?.Total ?? 0}");
+                return paginatedResponse?.Total ?? 0;
+            }
+            
+            // More detailed error logging
+            var errorContent = await response.Content.ReadAsStringAsync();
+            await _jsRuntime.InvokeVoidAsync("console.error", $"Failed to get saved tracks: {response.StatusCode}");
+            await _jsRuntime.InvokeVoidAsync("console.error", $"Error details: {errorContent}");
+            
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            await _jsRuntime.InvokeVoidAsync("console.error", $"Error getting saved tracks: {ex.Message}");
+            return 0;
+        }
+    }
+    
+    // Get user's playlists count
+    public async Task<int> GetPlaylistsCountAsync()
+    {
+        var token = await GetAccessTokenAsync();
+        if (string.IsNullOrEmpty(token))
+        {
+            return 0;
+        }
+        
+        try 
+        {
+            // We only need the total count, so limit=1 is sufficient
+            var request = new HttpRequestMessage(HttpMethod.Get, "https://api.spotify.com/v1/me/playlists?limit=1");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            
+            var response = await _httpClient.SendAsync(request);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                var paginatedResponse = JsonSerializer.Deserialize<PaginatedResponse>(content, options);
+                
+                return paginatedResponse?.Total ?? 0;
+            }
+            
+            await _jsRuntime.InvokeVoidAsync("console.error", $"Failed to get playlists: {response.StatusCode}");
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            await _jsRuntime.InvokeVoidAsync("console.error", $"Error getting playlists: {ex.Message}");
+            return 0;
+        }
+    }
+    
+    // Get count of artists the user is following
+    public async Task<int> GetFollowedArtistsCountAsync()
+    {
+        var token = await GetAccessTokenAsync();
+        if (string.IsNullOrEmpty(token))
+        {
+            return 0;
+        }
+        
+        try 
+        {
+            // Log that we're making the request
+            await _jsRuntime.InvokeVoidAsync("console.log", "Requesting followed artists from Spotify API...");
+            
+            // The following API is structured differently, it returns a "artists" object with total
+            var request = new HttpRequestMessage(HttpMethod.Get, "https://api.spotify.com/v1/me/following?type=artist&limit=1");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            
+            var response = await _httpClient.SendAsync(request);
+            
+            // Log the response status
+            await _jsRuntime.InvokeVoidAsync("console.log", $"Followed artists response status: {response.StatusCode}");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                
+                // Parse the JSON manually since the structure is different
+                using (JsonDocument doc = JsonDocument.Parse(content))
+                {
+                    if (doc.RootElement.TryGetProperty("artists", out JsonElement artists))
+                    {
+                        if (artists.TryGetProperty("total", out JsonElement total))
+                        {
+                            if (total.TryGetInt32(out int totalCount))
+                            {
+                                await _jsRuntime.InvokeVoidAsync("console.log", $"Retrieved followed artists count: {totalCount}");
+                                return totalCount;
+                            }
+                        }
+                    }
+                    
+                    // Log JSON structure for debugging
+                    await _jsRuntime.InvokeVoidAsync("console.log", $"JSON response structure: {content}");
+                }
+                
+                return 0;
+            }
+            
+            // More detailed error logging
+            var errorContent = await response.Content.ReadAsStringAsync();
+            await _jsRuntime.InvokeVoidAsync("console.error", $"Failed to get followed artists: {response.StatusCode}");
+            await _jsRuntime.InvokeVoidAsync("console.error", $"Error details: {errorContent}");
+            
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            await _jsRuntime.InvokeVoidAsync("console.error", $"Error getting followed artists: {ex.Message}");
+            return 0;
+        }
+    }
 }

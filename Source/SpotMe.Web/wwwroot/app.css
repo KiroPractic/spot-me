@@ -5,9 +5,12 @@ html, body {
     padding: 0;
     height: 100%;
     width: 100%;
-    overflow-x: hidden;
     color: #FFFFFF;
     background-color: #121212;
+}
+
+::selection {
+    background-color: rgba(29, 185, 84, 0.3);
 }
 
 /* Main App Container */
@@ -17,6 +20,28 @@ html, body {
     overflow-x: hidden;
     background-color: #121212;
     color: #FFFFFF;
+}
+
+/* Authentication Success Section */
+.authentication-success {
+    margin-top: 1rem;
+    padding: 1rem;
+    border-radius: 8px;
+    background-color: rgba(29, 185, 84, 0.1);
+    border: 1px solid rgba(29, 185, 84, 0.3);
+}
+
+/* Secondary button style */
+.spotify-button-secondary {
+    background-color: transparent;
+    border: 1px solid #1DB954;
+    color: #1DB954;
+}
+
+.spotify-button-secondary:hover {
+    background-color: rgba(29, 185, 84, 0.1);
+    color: #fff;
+    box-shadow: none;
 }
 
 /* Dark Container for Pages */
@@ -214,6 +239,11 @@ a {
 a:hover {
     color: #1ED760;
     text-decoration: underline;
+}
+
+/* Animations */
+@keyframes spin {
+    to { transform: rotate(360deg); }
 }
 
 /* Responsive Adjustments */

@@ -78,7 +78,29 @@
                     var key = keyValue[0];
                     var value = System.Web.HttpUtility.UrlDecode(keyValue[1]);
                     fragmentParams[key] = value;
-                    await JSRuntime.InvokeVoidAsync("console.log", $"Param: {key} = {value}");
+                    
+                    // Special handling for scope to make it more readable
+                    if (key == "scope")
+                    {
+                        await JSRuntime.InvokeVoidAsync("console.log", $"Param: {key} = {value}");
+                        // Log each scope for clearer visibility
+                        var scopes = value.Split(' ');
+                        await JSRuntime.InvokeVoidAsync("console.log", "Received scopes:");
+                        foreach (var scope in scopes)
+                        {
+                            await JSRuntime.InvokeVoidAsync("console.log", $"  - {scope}");
+                        }
+                    }
+                    else if (key == "access_token")
+                    {
+                        // Mask token for security
+                        var truncatedValue = value.Length > 10 ? $"{value.Substring(0, 10)}..." : value;
+                        await JSRuntime.InvokeVoidAsync("console.log", $"Param: {key} = {truncatedValue}");
+                    }
+                    else
+                    {
+                        await JSRuntime.InvokeVoidAsync("console.log", $"Param: {key} = {value}");
+                    }
                 }
             }
             
@@ -96,7 +118,13 @@
                     
                     // Successfully authenticated, redirect to home page
                     await JSRuntime.InvokeVoidAsync("console.log", "Authentication successful, redirecting to home page");
-                    NavigationManager.NavigateTo("/");
+                    
+                    // Use JavaScript to handle the navigation with a small delay
+                    await JSRuntime.InvokeVoidAsync("eval", @"
+                        setTimeout(function() {
+                            window.location.href = '/';
+                        }, 100);
+                    ");
                     return;
                 }
             }

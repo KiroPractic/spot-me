@@ -5,39 +5,183 @@
 @inject SpotifyAuthService AuthService
 @rendermode InteractiveServer
 
-<PageTitle>SpotMe - Spotify Player</PageTitle>
+<PageTitle>SpotMe - Home</PageTitle>
 
-<div class="dark-container">
-    <div class="spotify-content">
-        <h1>SpotMe</h1>
-        <p class="tagline">Your personal Spotify player experience</p>
-        
-        @if (isAuthenticated)
-        {
-            <div class="authentication-success">
-                <p class="mb-3"><i class="bi bi-check-circle-fill text-success"></i> Connected to Spotify</p>
-                <button @onclick="LogoutFromSpotify" class="spotify-button spotify-button-secondary">
-                    <i class="bi bi-box-arrow-right"></i> Disconnect
-                </button>
-            </div>
-        }
-        else
-        {
-            <button @onclick="AuthenticateWithSpotify" class="spotify-button">
-                <i class="bi bi-spotify"></i> Connect with Spotify
-            </button>
-        }
-        
-        @if (!string.IsNullOrEmpty(errorMessage))
-        {
-            <div class="error-message">@errorMessage</div>
-        }
+<div class="home-container">
+    <div class="welcome-section">
+        <h1>Welcome to SpotMe</h1>
+        <p>Your personal Spotify experience</p>
     </div>
+    
+    <div class="user-profile-section">
+        <div class="profile-header">
+            @if (!string.IsNullOrEmpty(ProfileImageUrl))
+            {
+                <img src="@ProfileImageUrl" alt="@ProfileName" class="profile-image" />
+            }
+            else
+            {
+                <div class="profile-placeholder">
+                    <i class="bi bi-person-circle"></i>
+                </div>
+            }
+            <div class="profile-info">
+                <h2>@ProfileName</h2>
+                <p>Connected to Spotify</p>
+            </div>
+        </div>
+        
+        <div class="stats-section">
+            <div class="stat-card">
+                <i class="bi bi-music-note"></i>
+                <div class="stat-info">
+                    <h3>Playlists</h3>
+                    @if (isLoadingStats)
+                    {
+                        <p><span class="loading-spinner"></span></p>
+                    }
+                    else
+                    {
+                        <p>@PlaylistsCount</p>
+                    }
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <i class="bi bi-heart"></i>
+                <div class="stat-info">
+                    <h3>Liked Songs</h3>
+                    @if (isLoadingStats)
+                    {
+                        <p><span class="loading-spinner"></span></p>
+                    }
+                    else
+                    {
+                        <p>@LikedSongsCount</p>
+                    }
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <i class="bi bi-person"></i>
+                <div class="stat-info">
+                    <h3>Following</h3>
+                    @if (isLoadingStats)
+                    {
+                        <p><span class="loading-spinner"></span></p>
+                    }
+                    else
+                    {
+                        <p>@FollowingCount</p>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="recent-activity">
+        <h2>Recent Activity</h2>
+        <p>Coming soon...</p>
+    </div>
+    
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="error-message">@errorMessage</div>
+    }
 </div>
 
 @code {
     private string? errorMessage;
-    private bool isAuthenticated = false;
+    private string ProfileName { get; set; } = "Spotify User";
+    private string? ProfileImageUrl { get; set; }
+    private int PlaylistsCount { get; set; } = 0;
+    private int LikedSongsCount { get; set; } = 0;
+    private int FollowingCount { get; set; } = 0;
+    private bool isLoadingStats = true;
+    
+    protected override async Task OnInitializedAsync()
+    {
+        try 
+        {
+            // Check if user is authenticated right away
+            var token = await AuthService.GetAccessTokenAsync();
+            
+            if (string.IsNullOrEmpty(token))
+            {
+                // Not authenticated, redirect to auth
+                await JSRuntime.InvokeVoidAsync("console.log", "User not authenticated, redirecting to auth page");
+                NavigationManager.NavigateTo("/auth", forceLoad: false);
+                return;
+            }
+            
+            // Get user profile info from Spotify
+            var profile = await AuthService.GetUserProfileAsync();
+            if (profile != null)
+            {
+                // Debug profile data
+                await JSRuntime.InvokeVoidAsync("console.log", $"Home page received profile - DisplayName: '{profile.DisplayName}', Email: '{profile.Email}'");
+                
+                // Extract display name, with fallback
+                ProfileName = !string.IsNullOrEmpty(profile.DisplayName) 
+                    ? profile.DisplayName 
+                    : (!string.IsNullOrEmpty(profile.Email) ? profile.Email : "Spotify User");
+                    
+                ProfileImageUrl = profile.Images?.FirstOrDefault()?.Url;
+                await JSRuntime.InvokeVoidAsync("console.log", $"Profile loaded: {ProfileName}");
+            }
+            
+            // Start loading user stats in parallel
+            await LoadUserStatsAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error in Home initialization: {ex.Message}");
+            errorMessage = $"Error: {ex.Message}";
+        }
+    }
+    
+    private async Task LoadUserStatsAsync()
+    {
+        try
+        {
+            isLoadingStats = true;
+            
+            // Create tasks to load stats in parallel
+            var playlistsTask = AuthService.GetPlaylistsCountAsync();
+            var likedSongsTask = AuthService.GetSavedTracksCountAsync();
+            var followingTask = AuthService.GetFollowedArtistsCountAsync();
+            
+            // Wait for all tasks to complete
+            await Task.WhenAll(playlistsTask, likedSongsTask, followingTask);
+            
+            // Get results - with fallback values in case any API fails
+            PlaylistsCount = await playlistsTask;
+            
+            try { LikedSongsCount = await likedSongsTask; } 
+            catch (Exception ex) 
+            { 
+                await JSRuntime.InvokeVoidAsync("console.error", $"Error getting liked songs count: {ex.Message}");
+                LikedSongsCount = 0;  // Fallback value
+            }
+            
+            try { FollowingCount = await followingTask; } 
+            catch (Exception ex) 
+            { 
+                await JSRuntime.InvokeVoidAsync("console.error", $"Error getting following count: {ex.Message}");
+                FollowingCount = 0;  // Fallback value
+            }
+            
+            await JSRuntime.InvokeVoidAsync("console.log", $"Stats loaded - Playlists: {PlaylistsCount}, Liked Songs: {LikedSongsCount}, Following: {FollowingCount}");
+            
+            isLoadingStats = false;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("console.error", $"Error loading stats: {ex.Message}");
+            isLoadingStats = false;
+        }
+    }
     
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -45,67 +189,154 @@
         {
             try 
             {
-                // Check if user is already authenticated
+                // Log for debugging
+                await JSRuntime.InvokeVoidAsync("console.log", "Home page rendered");
+                await JSRuntime.InvokeVoidAsync("console.log", $"Profile name: {ProfileName}");
+                await JSRuntime.InvokeVoidAsync("console.log", $"Profile image: {ProfileImageUrl ?? "none"}");
+                
+                // Check token again after rendering (in case it wasn't available during server prerendering)
                 var token = await AuthService.GetAccessTokenAsync();
-                isAuthenticated = !string.IsNullOrEmpty(token);
-                
-                await JSRuntime.InvokeVoidAsync("console.log", $"User is authenticated: {isAuthenticated}");
-                
-                // Since we're changing state, we need to call StateHasChanged
-                StateHasChanged();
+                if (string.IsNullOrEmpty(token))
+                {
+                    await JSRuntime.InvokeVoidAsync("console.log", "No token found after render, redirecting");
+                    // Use JS to navigate to avoid potential serialization issues with NavigationManager
+                    await JSRuntime.InvokeVoidAsync("eval", "window.location.href = '/auth';");
+                    return;
+                }
             }
             catch (Exception ex)
             {
-                await JSRuntime.InvokeVoidAsync("console.error", $"Error checking authentication: {ex.Message}");
+                await JSRuntime.InvokeVoidAsync("console.error", $"Error in OnAfterRenderAsync: {ex.Message}");
                 errorMessage = $"Error: {ex.Message}";
                 StateHasChanged();
             }
         }
     }
-    
-    private async Task AuthenticateWithSpotify()
-    {
-        try
-        {
-            // Log that we're starting authentication
-            await JSRuntime.InvokeVoidAsync("console.log", "Starting Spotify authentication...");
-            
-            // Configure the auth service with your client ID and redirect URI
-            var redirectUri = NavigationManager.BaseUri.TrimEnd('/') + "/callback";
-            await JSRuntime.InvokeVoidAsync("console.log", $"Using redirect URI: {redirectUri}");
-            AuthService.Configure("6bf1083c60b743a9841b7db2ca63117b", redirectUri);
-            
-            // Generate the auth URL and redirect
-            var authUrl = await AuthService.GenerateAuthUrlAsync();
-            
-            // Log the URL we're navigating to
-            await JSRuntime.InvokeVoidAsync("console.log", $"Navigating to auth URL: {authUrl}");
-            
-            // Use a safe redirect approach
-            await JSRuntime.InvokeVoidAsync("eval", $"setTimeout(function() {{ window.location.href = '{authUrl.Replace("'", "\\'")}'; }}, 100);");
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"Authentication error: {ex.Message}");
-            errorMessage = $"Error: {ex.Message}";
-            StateHasChanged();
-        }
-    }
-    
-    private async Task LogoutFromSpotify()
-    {
-        try
-        {
-            await AuthService.ClearAccessTokenAsync();
-            isAuthenticated = false;
-            StateHasChanged();
-            
-            await JSRuntime.InvokeVoidAsync("console.log", "User logged out from Spotify");
-        }
-        catch (Exception ex)
-        {
-            errorMessage = $"Logout error: {ex.Message}";
-            StateHasChanged();
-        }
-    }
 }
+
+<style>
+    .home-container {
+        padding: 1.5rem;
+        max-width: 1000px;
+        margin: 0 auto;
+    }
+    
+    .welcome-section {
+        margin-bottom: 2rem;
+    }
+    
+    .welcome-section h1 {
+        font-size: 2.5rem;
+        color: #fff;
+        margin-bottom: 0.5rem;
+    }
+    
+    .welcome-section p {
+        font-size: 1.2rem;
+        color: #b3b3b3;
+    }
+    
+    .user-profile-section {
+        background-color: #282828;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    
+    .profile-header {
+        display: flex;
+        align-items: center;
+        margin-bottom: 1.5rem;
+    }
+    
+    .profile-image,
+    .profile-placeholder {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        background-color: #333;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 1.5rem;
+        overflow: hidden;
+    }
+    
+    .profile-image {
+        object-fit: cover;
+    }
+    
+    .profile-placeholder i {
+        font-size: 40px;
+        color: #b3b3b3;
+    }
+    
+    .profile-info h2 {
+        margin: 0 0 0.5rem 0;
+        color: #fff;
+    }
+    
+    .profile-info p {
+        margin: 0;
+        color: #1DB954;
+    }
+    
+    .stats-section {
+        display: flex;
+        gap: 1rem;
+    }
+    
+    .stat-card {
+        flex: 1;
+        background-color: #181818;
+        border-radius: 6px;
+        padding: 1rem;
+        display: flex;
+        align-items: center;
+    }
+    
+    .stat-card i {
+        font-size: 24px;
+        color: #1DB954;
+        margin-right: 1rem;
+    }
+    
+    .stat-info h3 {
+        margin: 0 0 0.25rem 0;
+        font-size: 0.9rem;
+        color: #b3b3b3;
+    }
+    
+    .stat-info p {
+        margin: 0;
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #fff;
+    }
+    
+    .recent-activity {
+        background-color: #282828;
+        border-radius: 8px;
+        padding: 1.5rem;
+    }
+    
+    .recent-activity h2 {
+        margin-top: 0;
+        color: #fff;
+        font-size: 1.5rem;
+    }
+    
+    .recent-activity p {
+        color: #b3b3b3;
+    }
+    
+    .loading-spinner {
+        display: inline-block;
+        width: 1.25rem;
+        height: 1.25rem;
+        border: 2px solid rgba(255, 255, 255, 0.1);
+        border-radius: 50%;
+        border-top-color: #1DB954;
+        animation: spin 1s ease-in-out infinite;
+    }
+</style>
