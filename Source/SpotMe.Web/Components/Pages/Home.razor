@@ -3,6 +3,7 @@
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JSRuntime
 @inject SpotifyAuthService AuthService
+@rendermode InteractiveServer
 
 <PageTitle>SpotMe - Spotify Player</PageTitle>
 
@@ -11,9 +12,21 @@
         <h1>SpotMe</h1>
         <p class="tagline">Your personal Spotify player experience</p>
         
-        <button @onclick="AuthenticateWithSpotify" class="spotify-button">
-            <i class="bi bi-spotify"></i> Connect with Spotify
-        </button>
+        @if (isAuthenticated)
+        {
+            <div class="authentication-success">
+                <p class="mb-3"><i class="bi bi-check-circle-fill text-success"></i> Connected to Spotify</p>
+                <button @onclick="LogoutFromSpotify" class="spotify-button spotify-button-secondary">
+                    <i class="bi bi-box-arrow-right"></i> Disconnect
+                </button>
+            </div>
+        }
+        else
+        {
+            <button @onclick="AuthenticateWithSpotify" class="spotify-button">
+                <i class="bi bi-spotify"></i> Connect with Spotify
+            </button>
+        }
         
         @if (!string.IsNullOrEmpty(errorMessage))
         {
@@ -24,13 +37,29 @@
 
 @code {
     private string? errorMessage;
+    private bool isAuthenticated = false;
     
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender && NavigationManager.Uri.Contains("#access_token="))
+        if (firstRender)
         {
-            // Handle redirect from Spotify
-            await HandleAuthRedirect();
+            try 
+            {
+                // Check if user is already authenticated
+                var token = await AuthService.GetAccessTokenAsync();
+                isAuthenticated = !string.IsNullOrEmpty(token);
+                
+                await JSRuntime.InvokeVoidAsync("console.log", $"User is authenticated: {isAuthenticated}");
+                
+                // Since we're changing state, we need to call StateHasChanged
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                await JSRuntime.InvokeVoidAsync("console.error", $"Error checking authentication: {ex.Message}");
+                errorMessage = $"Error: {ex.Message}";
+                StateHasChanged();
+            }
         }
     }
     
@@ -42,7 +71,8 @@
             await JSRuntime.InvokeVoidAsync("console.log", "Starting Spotify authentication...");
             
             // Configure the auth service with your client ID and redirect URI
-            var redirectUri = NavigationManager.BaseUri.TrimEnd('/');
+            var redirectUri = NavigationManager.BaseUri.TrimEnd('/') + "/callback";
+            await JSRuntime.InvokeVoidAsync("console.log", $"Using redirect URI: {redirectUri}");
             AuthService.Configure("6bf1083c60b743a9841b7db2ca63117b", redirectUri);
             
             // Generate the auth URL and redirect
@@ -62,24 +92,19 @@
         }
     }
     
-    private async Task HandleAuthRedirect()
+    private async Task LogoutFromSpotify()
     {
         try
         {
-            if (await AuthService.HandleRedirectAsync())
-            {
-                // Successfully authenticated, redirect to player page
-                NavigationManager.NavigateTo("/player");
-            }
-            else
-            {
-                errorMessage = "Failed to authenticate with Spotify";
-                StateHasChanged();
-            }
+            await AuthService.ClearAccessTokenAsync();
+            isAuthenticated = false;
+            StateHasChanged();
+            
+            await JSRuntime.InvokeVoidAsync("console.log", "User logged out from Spotify");
         }
         catch (Exception ex)
         {
-            errorMessage = $"Authentication error: {ex.Message}";
+            errorMessage = $"Logout error: {ex.Message}";
             StateHasChanged();
         }
     }

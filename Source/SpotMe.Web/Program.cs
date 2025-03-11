@@ -30,7 +30,6 @@ builder.Services.AddScoped<SpotifyAuthService>(sp =>
         sp.GetRequiredService<IHttpClientFactory>().CreateClient()
     )
 );
-builder.Services.AddScoped<SpotifyPlayerService>();
 
 var app = builder.Build();
 

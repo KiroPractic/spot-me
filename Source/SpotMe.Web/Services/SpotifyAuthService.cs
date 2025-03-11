@@ -85,24 +85,48 @@ public class SpotifyAuthService
         {
             // Get the URL fragment from the browser
             var fragment = await _jsRuntime.InvokeAsync<string>("window.location.hash");
+            await _jsRuntime.InvokeVoidAsync("console.log", $"Hash fragment: {fragment}");
             
             if (string.IsNullOrEmpty(fragment) || !fragment.StartsWith("#"))
             {
+                await _jsRuntime.InvokeVoidAsync("console.log", "No hash fragment found in URL");
                 return false;
             }
 
-            // Extract the token data from the fragment
-            var fragmentParams = fragment.Substring(1)
-                .Split('&')
-                .Select(param => param.Split('='))
-                .ToDictionary(param => param[0], param => param[1]);
+            // Extract the token data from the fragment - log raw fragment for debugging
+            await _jsRuntime.InvokeVoidAsync("console.log", "Raw fragment:", fragment);
+            
+            // Use a more robust parsing approach
+            var fragmentParams = new Dictionary<string, string>();
+            var pairs = fragment.Substring(1).Split('&');
+            
+            foreach (var pair in pairs)
+            {
+                var keyValue = pair.Split('=', 2);
+                if (keyValue.Length == 2)
+                {
+                    var key = keyValue[0];
+                    var value = System.Web.HttpUtility.UrlDecode(keyValue[1]);
+                    fragmentParams[key] = value;
+                }
+            }
+            
+            await _jsRuntime.InvokeVoidAsync("console.log", "Parsed fragment parameters:", fragmentParams);
+            await _jsRuntime.InvokeVoidAsync("console.log", $"Access token found: {fragmentParams.ContainsKey("access_token")}");
+            
+            if (fragmentParams.ContainsKey("access_token")) {
+                await _jsRuntime.InvokeVoidAsync("console.log", $"Access token starts with: {fragmentParams["access_token"].Substring(0, Math.Min(10, fragmentParams["access_token"].Length))}...");
+            }
 
             // Verify the state to prevent CSRF attacks
             var storedState = await _jsRuntime.InvokeAsync<string>("localStorage.getItem", "spotify_auth_state");
             var returnedState = fragmentParams.GetValueOrDefault("state");
+            
+            await _jsRuntime.InvokeVoidAsync("console.log", $"Stored state: {storedState}, Returned state: {returnedState}");
 
             if (storedState != returnedState)
             {
+                await _jsRuntime.InvokeVoidAsync("console.log", "State mismatch - possible CSRF attack");
                 throw new InvalidOperationException("State mismatch - possible CSRF attack");
             }
 
@@ -113,25 +137,34 @@ public class SpotifyAuthService
             if (fragmentParams.TryGetValue("access_token", out var token))
             {
                 _accessToken = token;
+                await _jsRuntime.InvokeVoidAsync("console.log", "Access token received");
                 
                 if (fragmentParams.TryGetValue("expires_in", out var expiresIn) && int.TryParse(expiresIn, out var seconds))
                 {
                     _tokenExpiry = DateTime.UtcNow.AddSeconds(seconds);
+                    await _jsRuntime.InvokeVoidAsync("console.log", $"Token expires in {seconds} seconds");
                     
                     // Store in local storage for persistence
                     await StoreAccessTokenAsync(token, seconds);
                 }
                 
                 // Clear the fragment from the URL to avoid exposing the token
-                await _jsRuntime.InvokeVoidAsync("history.replaceState", null, "", "/spotify-player");
+                await _jsRuntime.InvokeVoidAsync("history.replaceState", null, "", "/callback");
                 
                 return true;
+            }
+            else
+            {
+                await _jsRuntime.InvokeVoidAsync("console.log", "No access_token found in fragment");
             }
             
             return false;
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            // Log the error to console
+            await _jsRuntime.InvokeVoidAsync("console.error", $"Error in HandleRedirectAsync: {ex.Message}");
+            
             // Clear any partial authentication state
             await _jsRuntime.InvokeVoidAsync("localStorage.removeItem", "spotify_auth_state");
             return false;
@@ -140,28 +173,46 @@ public class SpotifyAuthService
 
     public async Task<string?> GetAccessTokenAsync()
     {
-        // If we have a valid token, return it
-        if (!string.IsNullOrEmpty(_accessToken) && DateTime.UtcNow < _tokenExpiry)
+        try
         {
-            return _accessToken;
-        }
-
-        // Try to get the token from local storage
-        var storedToken = await _jsRuntime.InvokeAsync<string>("localStorage.getItem", "spotify_access_token");
-        var storedExpiryStr = await _jsRuntime.InvokeAsync<string>("localStorage.getItem", "spotify_token_expiry");
-
-        if (!string.IsNullOrEmpty(storedToken) && !string.IsNullOrEmpty(storedExpiryStr))
-        {
-            if (DateTime.TryParse(storedExpiryStr, out var storedExpiry) && DateTime.UtcNow < storedExpiry)
+            // If we have a valid token, return it
+            if (!string.IsNullOrEmpty(_accessToken) && DateTime.UtcNow < _tokenExpiry)
             {
-                _accessToken = storedToken;
-                _tokenExpiry = storedExpiry;
                 return _accessToken;
             }
-        }
 
-        // We need a new token via OAuth flow
-        return null;
+            // Try to get the token from local storage - handle prerendering case
+            try
+            {
+                var storedToken = await _jsRuntime.InvokeAsync<string>("localStorage.getItem", "spotify_access_token");
+                var storedExpiryStr = await _jsRuntime.InvokeAsync<string>("localStorage.getItem", "spotify_token_expiry");
+
+                if (!string.IsNullOrEmpty(storedToken) && !string.IsNullOrEmpty(storedExpiryStr))
+                {
+                    if (DateTime.TryParse(storedExpiryStr, out var storedExpiry) && DateTime.UtcNow < storedExpiry)
+                    {
+                        _accessToken = storedToken;
+                        _tokenExpiry = storedExpiry;
+                        return _accessToken;
+                    }
+                }
+            }
+            catch (InvalidOperationException)
+            {
+                // This happens during prerendering - just return null
+                // We'll check again in OnAfterRenderAsync
+                return null;
+            }
+
+            // We need a new token via OAuth flow
+            return null;
+        }
+        catch (Exception ex)
+        {
+            // Log exception but don't crash
+            Console.Error.WriteLine($"Error getting access token: {ex.Message}");
+            return null;
+        }
     }
 
     public async Task StoreAccessTokenAsync(string accessToken, int expiresIn)
