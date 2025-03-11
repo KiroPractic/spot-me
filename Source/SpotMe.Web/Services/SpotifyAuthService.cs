@@ -183,81 +183,46 @@ public class SpotifyAuthService
             // If we have a valid token in memory, return it
             if (!string.IsNullOrEmpty(_accessToken) && DateTime.UtcNow < _tokenExpiry)
             {
-                await _jsRuntime.InvokeVoidAsync("console.log", "Using in-memory token");
                 return _accessToken;
             }
 
-            // Try to get the token from local storage - handle prerendering case
             try
             {
-                // Log that we're checking localStorage
-                await _jsRuntime.InvokeVoidAsync("console.log", "Checking localStorage for token");
-                
-                // Debug what's in localStorage
-                var debugScript = @"
-                    let token = localStorage.getItem('spotify_access_token');
-                    let expiry = localStorage.getItem('spotify_token_expiry');
-                    console.log('localStorage check - token exists:', !!token);
-                    if (token) console.log('token starts with:', token.substring(0, 10) + '...');
-                    console.log('localStorage check - expiry exists:', !!expiry);
-                    if (expiry) console.log('expiry:', expiry);
-                ";
-                await _jsRuntime.InvokeVoidAsync("eval", debugScript);
-                
+                // Use a try/catch block to handle prerendering
                 var storedToken = await _jsRuntime.InvokeAsync<string>("localStorage.getItem", "spotify_access_token");
                 var storedExpiryStr = await _jsRuntime.InvokeAsync<string>("localStorage.getItem", "spotify_token_expiry");
 
                 if (!string.IsNullOrEmpty(storedToken) && !string.IsNullOrEmpty(storedExpiryStr))
                 {
-                    await _jsRuntime.InvokeVoidAsync("console.log", $"Found token in localStorage, checking validity");
-                    
                     if (DateTime.TryParse(storedExpiryStr, out var storedExpiry))
                     {
-                        await _jsRuntime.InvokeVoidAsync("console.log", $"Token expiry: {storedExpiry}, Now: {DateTime.UtcNow}");
-                        
                         if (DateTime.UtcNow < storedExpiry)
                         {
                             _accessToken = storedToken;
                             _tokenExpiry = storedExpiry;
-                            await _jsRuntime.InvokeVoidAsync("console.log", "Using valid token from localStorage");
                             return _accessToken;
                         }
-                        else
-                        {
-                            await _jsRuntime.InvokeVoidAsync("console.log", "Token expired");
-                        }
                     }
-                    else
-                    {
-                        await _jsRuntime.InvokeVoidAsync("console.log", $"Invalid expiry format: {storedExpiryStr}");
-                    }
-                }
-                else
-                {
-                    await _jsRuntime.InvokeVoidAsync("console.log", "No token found in localStorage");
                 }
             }
-            catch (InvalidOperationException ex)
+            catch (InvalidOperationException)
             {
                 // This happens during prerendering - just return null
                 // We'll check again in OnAfterRenderAsync
-                await _jsRuntime.InvokeVoidAsync("console.log", $"JS interop error during GetAccessTokenAsync: {ex.Message}");
                 return null;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                await _jsRuntime.InvokeVoidAsync("console.error", $"Error accessing localStorage: {ex.Message}");
+                // Silently handle other exceptions
             }
 
             // We need a new token via OAuth flow
-            await _jsRuntime.InvokeVoidAsync("console.log", "No valid token found, needs OAuth flow");
             return null;
         }
         catch (Exception ex)
         {
             // Log exception but don't crash
             Console.Error.WriteLine($"Error getting access token: {ex.Message}");
-            await _jsRuntime.InvokeVoidAsync("console.error", $"Error in GetAccessTokenAsync: {ex.Message}");
             return null;
         }
     }
@@ -307,27 +272,20 @@ public class SpotifyAuthService
         var token = await GetAccessTokenAsync();
         if (string.IsNullOrEmpty(token))
         {
-            await _jsRuntime.InvokeVoidAsync("console.error", "GetUserProfileAsync: No access token available");
             return null;
         }
         
         try 
         {
-            await _jsRuntime.InvokeVoidAsync("console.log", "Requesting user profile from Spotify API...");
-            
             // Create a new request to the Spotify API
             var request = new HttpRequestMessage(HttpMethod.Get, "https://api.spotify.com/v1/me");
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
             
             var response = await _httpClient.SendAsync(request);
-            await _jsRuntime.InvokeVoidAsync("console.log", $"User profile response status: {response.StatusCode}");
             
             if (response.IsSuccessStatusCode)
             {
                 var content = await response.Content.ReadAsStringAsync();
-                
-                // Log the raw JSON for debugging
-                await _jsRuntime.InvokeVoidAsync("console.log", "Raw profile JSON:", content);
                 
                 var options = new JsonSerializerOptions
                 {
@@ -335,38 +293,16 @@ public class SpotifyAuthService
                 };
                 
                 var profile = JsonSerializer.Deserialize<SpotifyUserProfile>(content, options);
-                
-                if (profile != null)
-                {
-                    await _jsRuntime.InvokeVoidAsync("console.log", $"Parsed profile - DisplayName: '{profile.DisplayName}', Email: '{profile.Email}'");
-                    
-                    if (profile.Images != null && profile.Images.Count > 0)
-                    {
-                        await _jsRuntime.InvokeVoidAsync("console.log", $"Found {profile.Images.Count} profile images, first URL: {profile.Images[0].Url}");
-                    }
-                    else
-                    {
-                        await _jsRuntime.InvokeVoidAsync("console.log", "No profile images found");
-                    }
-                }
-                else
-                {
-                    await _jsRuntime.InvokeVoidAsync("console.error", "Failed to deserialize profile");
-                }
-                
                 return profile;
             }
             
             // Handle error cases
-            var errorContent = await response.Content.ReadAsStringAsync();
-            await _jsRuntime.InvokeVoidAsync("console.error", $"Failed to get user profile: {response.StatusCode}");
-            await _jsRuntime.InvokeVoidAsync("console.error", $"Error details: {errorContent}");
+            Console.Error.WriteLine($"Failed to get user profile: {response.StatusCode}");
             return null;
         }
         catch (Exception ex)
         {
-            await _jsRuntime.InvokeVoidAsync("console.error", $"Error getting user profile: {ex.Message}");
-            await _jsRuntime.InvokeVoidAsync("console.error", $"Stack trace: {ex.StackTrace}");
+            Console.Error.WriteLine($"Error getting user profile: {ex.Message}");
             return null;
         }
     }

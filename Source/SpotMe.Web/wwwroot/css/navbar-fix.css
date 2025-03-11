@@ -1,0 +1,14 @@
+/* CSS fixes for navbar visibility issues */
+
+/* When navbar is shown, add padding to main content */
+.main-content.with-navbar {
+    padding-top: 60px !important;
+}
+
+/* Ensure auth debug panel stays on top */
+#auth-debug-panel {
+    z-index: 9999 !important;
+}
+
+/* Ensure proper bootstrap icons are loaded */
+@import url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css");

@@ -1,5 +1,6 @@
 ﻿@inherits LayoutComponentBase
 @using SpotMe.Web.Services
+@using SpotMe.Web.Models
 @using System.Diagnostics
 @implements IDisposable
 @inject IJSRuntime JSRuntime
@@ -7,54 +8,57 @@
 @inject NavigationManager NavigationManager
 
 <div class="app-layout">
+    @* Debug authentication status *@
+    <div id="auth-debug-panel" style="position: fixed; top: 0; right: 0; background: rgba(0,0,0,0.7); color: white; padding: 5px; z-index: 9999; font-size: 12px;">
+        Auth: @isAuthenticated, Profile: @(userProfile?.DisplayName ?? "none")
+    </div>
+
     @if (isAuthenticated)
     {
-        <nav class="top-navbar">
-            <div class="navbar-brand">
-                <i class="bi bi-spotify spotify-icon"></i>
+        <!-- Inline styled navbar with ID for direct DOM access -->
+        <div id="spotme-navbar" style="position: fixed; top: 0; left: 0; right: 0; height: 60px; background-color: #121212; color: #fff; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; z-index: 1000; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);">
+            <!-- Brand -->
+            <div style="display: flex; align-items: center; font-size: 1.5rem; font-weight: 700;">
+                <i class="bi bi-spotify" style="color: #1DB954; font-size: 1.75rem; margin-right: 10px;"></i>
                 <span>SpotMe</span>
             </div>
             
-            <ul class="nav-links">
-                <li class="@GetActiveClass("/")">
-                    <a href="/">
-                        <i class="bi bi-house-door"></i>
-                        <span>Home</span>
-                    </a>
-                </li>
-                <li class="@GetActiveClass("/search")">
-                    <a href="/search">
-                        <i class="bi bi-search"></i>
-                        <span>Search</span>
-                    </a>
-                </li>
-                <li class="@GetActiveClass("/playlists")">
-                    <a href="/playlists">
-                        <i class="bi bi-music-note-list"></i>
-                        <span>Playlists</span>
-                    </a>
-                </li>
-            </ul>
+            <!-- Navigation Links -->
+            <div style="display: flex; list-style: none; margin: 0; padding: 0;">
+                <a href="/" style="display: flex; align-items: center; padding: 8px 12px; color: #fff; text-decoration: none; border-radius: 4px; margin: 0 5px;">
+                    <i class="bi bi-house-door" style="margin-right: 8px;"></i>
+                    <span>Home</span>
+                </a>
+                <a href="/search" style="display: flex; align-items: center; padding: 8px 12px; color: #b3b3b3; text-decoration: none; border-radius: 4px; margin: 0 5px;">
+                    <i class="bi bi-search" style="margin-right: 8px;"></i>
+                    <span>Search</span>
+                </a>
+                <a href="/playlists" style="display: flex; align-items: center; padding: 8px 12px; color: #b3b3b3; text-decoration: none; border-radius: 4px; margin: 0 5px;">
+                    <i class="bi bi-music-note-list" style="margin-right: 8px;"></i>
+                    <span>Playlists</span>
+                </a>
+            </div>
             
-            <div class="user-section">
-                <div class="user-profile">
+            <!-- User Section -->
+            <div style="display: flex; align-items: center;">
+                <div style="display: flex; align-items: center; margin-right: 15px;">
                     @if (!string.IsNullOrEmpty(userProfile?.ImageUrl))
                     {
-                        <img src="@userProfile.ImageUrl" alt="@userProfile.DisplayName" class="profile-img" />
+                        <img src="@userProfile.ImageUrl" alt="@userProfile.DisplayName" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; margin-right: 10px;" />
                     }
                     else
                     {
-                        <i class="bi bi-person-circle profile-icon"></i>
+                        <i class="bi bi-person-circle" style="font-size: 24px; color: #b3b3b3; margin-right: 10px;"></i>
                     }
-                    <span class="username">@(userProfile?.DisplayName ?? "User")</span>
+                    <span style="color: #fff; font-weight: 500;">@(userProfile?.DisplayName ?? "User")</span>
                 </div>
                 
-                <button @onclick="HandleLogout" class="logout-btn">
-                    <i class="bi bi-box-arrow-right"></i>
+                <button @onclick="HandleLogout" style="background-color: transparent; border: 1px solid #333; color: #b3b3b3; display: flex; align-items: center; padding: 6px 12px; border-radius: 4px; cursor: pointer;">
+                    <i class="bi bi-box-arrow-right" style="margin-right: 6px;"></i>
                     <span>Logout</span>
                 </button>
             </div>
-        </nav>
+        </div>
     }
     
     <main class="main-content @(isAuthenticated ? "with-navbar" : "")">
@@ -89,6 +93,15 @@
     {
         NavigationManager.LocationChanged -= OnLocationChanged;
     }
+    
+    // Static method that can be called from JavaScript
+    [JSInvokable]
+    public static Task ForceRefreshAuthStatus()
+    {
+        // This would need to be handled differently - this is just a placeholder
+        Console.WriteLine("ForceRefreshAuthStatus called from JS");
+        return Task.CompletedTask;
+    }
 
     // Add an initialization method to check auth status early
     protected override async Task OnInitializedAsync()
@@ -96,7 +109,7 @@
         await CheckAuthenticationStatus();
     }
     
-    private async Task CheckAuthenticationStatus()
+    private async Task CheckAuthenticationStatus(bool forceRefresh = false)
     {
         try
         {
@@ -105,18 +118,19 @@
             
             // Check if we have a valid token
             var wasAuthenticated = isAuthenticated;
-            isAuthenticated = !string.IsNullOrEmpty(token);
+            var newAuthState = !string.IsNullOrEmpty(token);
             
-            // Only update profile if authentication state changed or we don't have a profile yet
-            if (isAuthenticated && (wasAuthenticated != isAuthenticated || userProfile == null))
+            // Set the authenticated state
+            isAuthenticated = newAuthState;
+            
+            // Only update profile if authentication state changed or we don't have a profile yet or force refresh
+            if (isAuthenticated && (wasAuthenticated != isAuthenticated || userProfile == null || forceRefresh))
             {
                 // Fetch the user profile from Spotify
                 var spotifyProfile = await AuthService.GetUserProfileAsync();
                 
                 if (spotifyProfile != null)
                 {
-                    await JSRuntime.InvokeVoidAsync("console.log", $"MainLayout received profile - DisplayName: '{spotifyProfile.DisplayName}', Email: '{spotifyProfile.Email}'");
-                    
                     // Extract display name, with fallback
                     string displayName = !string.IsNullOrEmpty(spotifyProfile.DisplayName) 
                         ? spotifyProfile.DisplayName 
@@ -130,7 +144,12 @@
                     };
                     
                     Console.WriteLine($"Fetched user profile: {displayName}");
-                    await JSRuntime.InvokeVoidAsync("console.log", $"User authenticated: {isAuthenticated}, Profile: {displayName}");
+                    
+                    // Store the profile name in localStorage for our JavaScript fix to use
+                    await JSRuntime.InvokeVoidAsync("localStorage.setItem", "spotify_user_name", displayName);
+                    
+                    // Trigger our navbar fix after profile is loaded
+                    await JSRuntime.InvokeVoidAsync("eval", "if (window.spotmeFix && window.spotmeFix.checkNavbar) { window.spotmeFix.checkNavbar(); }");
                 }
                 else
                 {
@@ -142,6 +161,9 @@
                     };
                     
                     Console.WriteLine("Failed to get Spotify profile");
+                    
+                    // Store a fallback name for our JavaScript fix
+                    await JSRuntime.InvokeVoidAsync("localStorage.setItem", "spotify_user_name", "Spotify User");
                 }
             }
             
@@ -170,16 +192,33 @@
             try
             {
                 // JS code is now safe to run
-                await JSRuntime.InvokeVoidAsync("console.log", $"Layout rendered, authenticated: {isAuthenticated}");
+                await JSRuntime.InvokeVoidAsync("console.log", "MainLayout first render - checking auth status directly");
                 
-                // If the token is stored in localStorage but we didn't detect it during server-side rendering,
-                // check auth status again now that we can use JS interop
-                await CheckAuthenticationStatus();
-                
-                if (userProfile != null)
-                {
-                    await JSRuntime.InvokeVoidAsync("console.log", $"User profile: {userProfile.DisplayName}");
+                // DIRECT CHECK: Directly check localStorage for token without going through SpotifyAuthService
+                try {
+                    var directToken = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "spotify_access_token");
+                    var directHasToken = !string.IsNullOrEmpty(directToken);
+                    
+                    await JSRuntime.InvokeVoidAsync("console.log", $"Direct localStorage check - token exists: {directHasToken}");
+                    
+                    if (directHasToken)
+                    {
+                        // We have a token, so we should be authenticated
+                        isAuthenticated = true;
+                        
+                        // Force the UI to update to show the navbar
+                        StateHasChanged();
+                        
+                        // Now also run the normal auth check to get the profile
+                        await CheckAuthenticationStatus(true);
+                    }
                 }
+                catch (Exception ex) {
+                    await JSRuntime.InvokeVoidAsync("console.error", "Error in direct token check: " + ex.Message);
+                }
+                
+                // Trigger our navbar fix JavaScript
+                await JSRuntime.InvokeVoidAsync("eval", "if (window.spotmeFix && window.spotmeFix.checkNavbar) { window.spotmeFix.checkNavbar(); }");
                 
                 // Add Spotify SDK loading logic
                 await JSRuntime.InvokeVoidAsync("eval", @"
@@ -242,11 +281,5 @@
         NavigationManager.NavigateTo("/auth");
     }
     
-    // Simple user profile model - we'll expand this later
-    public class UserProfile
-    {
-        public string? DisplayName { get; set; }
-        public string? Email { get; set; }
-        public string? ImageUrl { get; set; }
-    }
+    // UserProfile model is now defined in SpotMe.Web.Models namespace
 }

@@ -1,4 +1,5 @@
 @inject NavigationManager NavigationManager
+@using SpotMe.Web.Models
 
 <aside class="sidebar">
     <div class="sidebar-header">
@@ -58,7 +59,7 @@
 
 @code {
     [Parameter]
-    public MainLayout.UserProfile? UserProfile { get; set; }
+    public UserProfile? UserProfile { get; set; }
     
     [Parameter]
     public EventCallback OnLogout { get; set; }
