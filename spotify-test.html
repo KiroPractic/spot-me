@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Spotify Web Playback SDK Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        button {
+            padding: 10px;
+            margin: 10px 0;
+            background-color: #1DB954;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        #status {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Spotify Web Playback SDK Test</h1>
+    
+    <p>This is a simple test page for the Spotify Web Playback SDK.</p>
+    
+    <div>
+        <label for="token">Enter your Spotify access token:</label><br>
+        <input type="text" id="token" style="width: 100%; padding: 5px;">
+        <p><small>You can get a token from <a href="https://developer.spotify.com/documentation/web-playback-sdk/tutorials/getting-started" target="_blank">Spotify Developer Console</a></small></p>
+    </div>
+    
+    <button id="connect">Connect to Spotify</button>
+    <button id="togglePlay" disabled>Play/Pause</button>
+    <button id="next" disabled>Next Track</button>
+    <button id="prev" disabled>Previous Track</button>
+    
+    <div id="status">Status: Not connected</div>
+    
+    <div id="current-track" style="margin-top: 20px;"></div>
+    
+    <script src="https://sdk.scdn.co/spotify-player.js"></script>
+    <script>
+        let player;
+        let deviceId;
+        
+        window.onSpotifyWebPlaybackSDKReady = () => {
+            document.getElementById('connect').addEventListener('click', () => {
+                const token = document.getElementById('token').value;
+                if (!token) {
+                    updateStatus('Please enter a valid token');
+                    return;
+                }
+                
+                player = new Spotify.Player({
+                    name: 'Web Playback SDK Test Player',
+                    getOAuthToken: cb => { cb(token); },
+                    volume: 0.5
+                });
+                
+                // Error handling
+                player.addListener('initialization_error', ({ message }) => {
+                    updateStatus('Initialization Error: ' + message);
+                });
+                
+                player.addListener('authentication_error', ({ message }) => {
+                    updateStatus('Authentication Error: ' + message);
+                });
+                
+                player.addListener('account_error', ({ message }) => {
+                    updateStatus('Account Error: ' + message);
+                });
+                
+                player.addListener('playback_error', ({ message }) => {
+                    updateStatus('Playback Error: ' + message);
+                });
+                
+                // Ready
+                player.addListener('ready', ({ device_id }) => {
+                    deviceId = device_id;
+                    updateStatus('Connected! Device ID: ' + device_id);
+                    enableButtons();
+                });
+                
+                // Not Ready
+                player.addListener('not_ready', ({ device_id }) => {
+                    updateStatus('Device ID has gone offline: ' + device_id);
+                    disableButtons();
+                });
+                
+                // Player State
+                player.addListener('player_state_changed', (state) => {
+                    if (state) {
+                        updateTrackInfo(state);
+                    }
+                });
+                
+                // Connect to the player!
+                player.connect();
+            });
+            
+            document.getElementById('togglePlay').addEventListener('click', () => {
+                player.togglePlay();
+            });
+            
+            document.getElementById('next').addEventListener('click', () => {
+                player.nextTrack();
+            });
+            
+            document.getElementById('prev').addEventListener('click', () => {
+                player.previousTrack();
+            });
+        };
+        
+        function updateStatus(message) {
+            document.getElementById('status').textContent = 'Status: ' + message;
+        }
+        
+        function enableButtons() {
+            document.getElementById('togglePlay').disabled = false;
+            document.getElementById('next').disabled = false;
+            document.getElementById('prev').disabled = false;
+        }
+        
+        function disableButtons() {
+            document.getElementById('togglePlay').disabled = true;
+            document.getElementById('next').disabled = true;
+            document.getElementById('prev').disabled = true;
+        }
+        
+        function updateTrackInfo(state) {
+            const trackDiv = document.getElementById('current-track');
+            
+            if (state.track_window.current_track) {
+                const track = state.track_window.current_track;
+                
+                let html = `
+                    <h3>Now Playing:</h3>
+                    <div style="display: flex; align-items: center;">
+                        <img src="${track.album.images[0].url}" style="width: 80px; height: 80px; margin-right: 10px;">
+                        <div>
+                            <div><strong>${track.name}</strong></div>
+                            <div>${track.artists.map(a => a.name).join(', ')}</div>
+                            <div>${track.album.name}</div>
+                        </div>
+                    </div>
+                `;
+                
+                trackDiv.innerHTML = html;
+            } else {
+                trackDiv.innerHTML = '<p>No track currently playing</p>';
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,19 +1,8 @@
 ﻿@inherits LayoutComponentBase
+@inject IJSRuntime JSRuntime
 
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
-
-    <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
-        </div>
-
-        <article class="content px-4">
-            @Body
-        </article>
-    </main>
+<div class="app-container">
+    @Body
 </div>
 
 <div id="blazor-error-ui">
@@ -29,10 +18,47 @@
         
         if (firstRender)
         {
-            // This will ensure scripts are loaded only once
-            await JSRuntime.InvokeVoidAsync("eval", "if (!window.spotifyScriptLoaded) { window.spotifyScriptLoaded = true; var script = document.createElement('script'); script.src = 'https://sdk.scdn.co/spotify-player.js'; document.body.appendChild(script); }");
+            try
+            {
+                // Add a check to see if we already have Spotify scripts loaded
+                await JSRuntime.InvokeVoidAsync("eval", @"
+                    // Define global namespace for SpotMe app
+                    window.SpotMe = window.SpotMe || {};
+                    
+                    // Safe script loading function
+                    window.SpotMe.loadSpotifySDK = function() {
+                        console.log('Loading Spotify Web Playback SDK...');
+                        if (!window.spotifyScriptLoaded) {
+                            window.spotifyScriptLoaded = true;
+                            return new Promise((resolve, reject) => {
+                                const script = document.createElement('script');
+                                script.src = 'https://sdk.scdn.co/spotify-player.js';
+                                script.onload = () => {
+                                    console.log('Spotify SDK loaded successfully');
+                                    resolve();
+                                };
+                                script.onerror = (err) => {
+                                    console.error('Failed to load Spotify SDK:', err);
+                                    reject(err);
+                                };
+                                document.body.appendChild(script);
+                            });
+                        } else {
+                            console.log('Spotify SDK already loaded');
+                            return Promise.resolve();
+                        }
+                    };
+                    
+                    // Only try to load if we're on a page that needs it
+                    if (window.location.pathname === '/player') {
+                        window.SpotMe.loadSpotifySDK();
+                    }
+                ");
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Error loading Spotify SDK: {ex.Message}");
+            }
         }
     }
 }
-
-@inject IJSRuntime JSRuntime

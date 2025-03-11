@@ -29,7 +29,7 @@ public class SpotifyAuthService
         _redirectUri = redirectUri;
     }
 
-    public string GenerateAuthUrl()
+    public async Task<string> GenerateAuthUrlAsync()
     {
         if (string.IsNullOrEmpty(_clientId) || string.IsNullOrEmpty(_redirectUri))
         {
@@ -40,7 +40,30 @@ public class SpotifyAuthService
         var state = Guid.NewGuid().ToString();
         
         // Store the state in local storage
-        _jsRuntime.InvokeVoidAsync("localStorage.setItem", "spotify_auth_state", state);
+        await _jsRuntime.InvokeVoidAsync("localStorage.setItem", "spotify_auth_state", state);
+
+        // Build the Spotify authorization URL
+        var queryParams = new Dictionary<string, string>
+        {
+            { "client_id", _clientId },
+            { "response_type", "token" },
+            { "redirect_uri", _redirectUri },
+            { "scope", _requiredScopes },
+            { "state", state },
+            { "show_dialog", "true" }
+        };
+
+        return QueryHelpers.AddQueryString("https://accounts.spotify.com/authorize", queryParams);
+    }
+    
+    // Keep the old method for backward compatibility, but it will use a fire-and-forget approach
+    public string GenerateAuthUrl()
+    {
+        // Generate a random state value for security
+        var state = Guid.NewGuid().ToString();
+        
+        // Fire and forget - not ideal but keeps the existing API
+        _ = _jsRuntime.InvokeVoidAsync("localStorage.setItem", "spotify_auth_state", state);
 
         // Build the Spotify authorization URL
         var queryParams = new Dictionary<string, string>
@@ -94,10 +117,13 @@ public class SpotifyAuthService
                 if (fragmentParams.TryGetValue("expires_in", out var expiresIn) && int.TryParse(expiresIn, out var seconds))
                 {
                     _tokenExpiry = DateTime.UtcNow.AddSeconds(seconds);
+                    
+                    // Store in local storage for persistence
+                    await StoreAccessTokenAsync(token, seconds);
                 }
                 
                 // Clear the fragment from the URL to avoid exposing the token
-                await _jsRuntime.InvokeVoidAsync("history.replaceState", null, "", ".");
+                await _jsRuntime.InvokeVoidAsync("history.replaceState", null, "", "/spotify-player");
                 
                 return true;
             }

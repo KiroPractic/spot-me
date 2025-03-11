@@ -1,5 +1,7 @@
 using SpotMe.Web.Components;
 using SpotMe.Web.Services;
+using Microsoft.JSInterop;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -7,10 +9,28 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-// Register Spotify services
-builder.Services.AddScoped<SpotifyAuthService>();
-builder.Services.AddScoped<SpotifyPlayerService>();
+// Register HttpClient
 builder.Services.AddHttpClient();
+
+// Add CORS services
+builder.Services.AddCors();
+
+// Configure JSON serialization
+builder.Services.AddControllers()
+    .AddJsonOptions(options => 
+    {
+        options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+        options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+    });
+
+// Register Spotify services
+builder.Services.AddScoped<SpotifyAuthService>(sp => 
+    new SpotifyAuthService(
+        sp.GetRequiredService<IJSRuntime>(),
+        sp.GetRequiredService<IHttpClientFactory>().CreateClient()
+    )
+);
+builder.Services.AddScoped<SpotifyPlayerService>();
 
 var app = builder.Build();
 
@@ -18,14 +38,18 @@ var app = builder.Build();
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
 
 app.UseHttpsRedirection();
-
 app.UseStaticFiles();
 app.UseAntiforgery();
+
+// Enable CORS for Spotify API
+app.UseCors(builder => builder
+    .WithOrigins("https://accounts.spotify.com", "https://api.spotify.com")
+    .AllowAnyMethod()
+    .AllowAnyHeader());
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
