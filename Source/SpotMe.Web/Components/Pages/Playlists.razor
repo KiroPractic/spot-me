@@ -53,7 +53,9 @@
                         <h3 class="playlist-name">@playlist.Name</h3>
                         @if (!string.IsNullOrEmpty(playlist.Description))
                         {
-                            <p class="playlist-description">@playlist.Description</p>
+                            <p class="playlist-description">
+                                @((MarkupString)CleanDescription(playlist.Description))
+                            </p>
                         }
                         <div class="playlist-meta">
                             <span class="playlist-tracks">@playlist.Tracks?.Total tracks</span>
@@ -120,5 +122,29 @@
             _loading = false;
             StateHasChanged();
         }
+    }
+    
+    private string CleanDescription(string description)
+    {
+        if (string.IsNullOrEmpty(description))
+        {
+            return string.Empty;
+        }
+        
+        // Remove potentially unsafe tags but allow safe formatting
+        string safeDescription = System.Text.RegularExpressions.Regex.Replace(
+            description, 
+            @"<(?!/?(?:b|i|p|br\s?/?)(?:\s[^>]*)?>)[^>]*>", 
+            string.Empty
+        );
+        
+        // Convert any URLs to actual links
+        safeDescription = System.Text.RegularExpressions.Regex.Replace(
+            safeDescription,
+            @"(https?://[^\s<]+)",
+            "<a href=\"$1\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"playlist-link\">$1</a>"
+        );
+        
+        return safeDescription;
     }
 }

@@ -511,6 +511,18 @@ a:hover {
     color: #1ED760;
 }
 
+.playlist-link {
+    color: #1DB954;
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.2s ease;
+}
+
+.playlist-link:hover {
+    color: #1ED760;
+    text-decoration: underline;
+}
+
 /* Responsive Adjustments */
 @media (max-width: 768px) {
     .spotify-content {
