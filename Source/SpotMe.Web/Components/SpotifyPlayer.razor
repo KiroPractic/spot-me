@@ -1,0 +1,270 @@
+@using SpotMe.Web.Services
+@inject IJSRuntime JSRuntime
+@inject SpotifyAuthService AuthService
+@implements IAsyncDisposable
+@rendermode InteractiveServer
+
+<div class="spotify-player-container @(_isVisible ? "visible" : "hidden")">
+    <div class="spotify-player">
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <div class="player-error">
+                <i class="bi bi-exclamation-triangle"></i>
+                <span>@_errorMessage</span>
+                <button @onclick="DismissError" class="error-dismiss">×</button>
+            </div>
+        }
+        else
+        {
+            <div class="player-controls">
+                <div class="playback-controls">
+                    <button class="control-btn" @onclick="PreviousTrack" disabled="@(!_isPlayerReady || !_isPlaying)">
+                        <i class="bi bi-skip-backward-fill"></i>
+                    </button>
+                    <button class="play-pause-btn" @onclick="TogglePlayback">
+                        @if (_isPlaying)
+                        {
+                            <i class="bi bi-pause-circle-fill"></i>
+                        }
+                        else
+                        {
+                            <i class="bi bi-play-circle-fill"></i>
+                        }
+                    </button>
+                    <button class="control-btn" @onclick="NextTrack" disabled="@(!_isPlayerReady || !_isPlaying)">
+                        <i class="bi bi-skip-forward-fill"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="player-track-info">
+                @if (!string.IsNullOrEmpty(_currentTrackImageUrl))
+                {
+                    <img src="@_currentTrackImageUrl" alt="@_currentTrackName" class="track-artwork" />
+                }
+                else
+                {
+                    <div class="track-artwork-placeholder">
+                        <i class="bi bi-music-note"></i>
+                    </div>
+                }
+                
+                <div class="track-details">
+                    <div class="track-name">@_currentTrackName</div>
+                    <div class="track-artist">@_currentTrackArtist</div>
+                </div>
+            </div>
+            
+            <div class="player-volume">
+                <i class="bi bi-volume-up volume-icon"></i>
+                <input type="range" min="0" max="100" @bind="_volumeLevel" @oninput="HandleVolumeChange" class="volume-slider" />
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private bool _isVisible = false;
+    private bool _isPlayerReady = false;
+    private bool _isPlaying = false;
+    private string _currentTrackName = "Not Playing";
+    private string _currentTrackArtist = "No Artist";
+    private string _currentTrackImageUrl = "";
+    private int _volumeLevel = 50;
+    private string _errorMessage = "";
+    private DotNetObjectReference<SpotifyPlayer>? _dotNetReference;
+    
+    protected override async Task OnInitializedAsync()
+    {
+        // Check if user is authenticated
+        var token = await AuthService.GetAccessTokenAsync();
+        _isVisible = !string.IsNullOrEmpty(token);
+        
+        // Register for authentication events
+        AuthService.OnAuthStateChanged += HandleAuthStateChanged;
+    }
+    
+    private async void HandleAuthStateChanged(bool isAuthenticated)
+    {
+        _isVisible = isAuthenticated;
+        
+        if (isAuthenticated)
+        {
+            // Reinitialize the player when authentication state changes
+            await InitializePlayer();
+        }
+        
+        await InvokeAsync(StateHasChanged);
+    }
+    
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Register the Blazor instance in JavaScript
+            await JSRuntime.InvokeVoidAsync("console.log", "Registering player component with JS");
+            await JSRuntime.InvokeVoidAsync("spotifyPlayer.registerDotNetInstance", DotNetObjectReference.Create(this));
+            
+            // Check if SDK is ready and user is authenticated
+            if (_isVisible)
+            {
+                await InitializePlayer();
+            }
+        }
+    }
+    
+    private async Task InitializePlayer()
+    {
+        try
+        {
+            _dotNetReference = DotNetObjectReference.Create(this);
+            
+            var token = await AuthService.GetAccessTokenAsync();
+            if (!string.IsNullOrEmpty(token))
+            {
+                Console.WriteLine("Initializing Spotify player with token");
+                await JSRuntime.InvokeVoidAsync("console.log", "Initializing Spotify Web Player from Blazor");
+                await JSRuntime.InvokeVoidAsync("spotifyPlayer.initialize", token, _dotNetReference);
+            }
+            else
+            {
+                Console.WriteLine("Cannot initialize player - no token available");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error initializing Spotify player: {ex.Message}");
+            await JSRuntime.InvokeVoidAsync("console.error", $"Error initializing Spotify player: {ex.Message}");
+        }
+    }
+    
+    private async Task TogglePlayback()
+    {
+        if (!_isPlayerReady)
+        {
+            return;
+        }
+        
+        try
+        {
+            if (_isPlaying)
+            {
+                await JSRuntime.InvokeVoidAsync("spotifyPlayer.pause");
+            }
+            else
+            {
+                await JSRuntime.InvokeVoidAsync("spotifyPlayer.play");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error toggling playback: {ex.Message}");
+        }
+    }
+    
+    private async Task PreviousTrack()
+    {
+        if (!_isPlayerReady || !_isPlaying)
+        {
+            return;
+        }
+        
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("spotifyPlayer.previousTrack");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error going to previous track: {ex.Message}");
+        }
+    }
+    
+    private async Task NextTrack()
+    {
+        if (!_isPlayerReady || !_isPlaying)
+        {
+            return;
+        }
+        
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("spotifyPlayer.nextTrack");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error going to next track: {ex.Message}");
+        }
+    }
+    
+    private async Task HandleVolumeChange(ChangeEventArgs e)
+    {
+        if (!_isPlayerReady || e.Value == null)
+        {
+            return;
+        }
+        
+        try
+        {
+            if (int.TryParse(e.Value.ToString(), out int volume))
+            {
+                _volumeLevel = volume;
+                await JSRuntime.InvokeVoidAsync("spotifyPlayer.setVolume", volume / 100.0);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error changing volume: {ex.Message}");
+        }
+    }
+    
+    [JSInvokable]
+    public void OnPlayerReady()
+    {
+        _isPlayerReady = true;
+        StateHasChanged();
+    }
+    
+    [JSInvokable]
+    public void OnPlaybackStateChanged(bool isPlaying, string trackName, string trackArtist, string imageUrl)
+    {
+        _isPlaying = isPlaying;
+        _currentTrackName = string.IsNullOrEmpty(trackName) ? "Not Playing" : trackName;
+        _currentTrackArtist = string.IsNullOrEmpty(trackArtist) ? "No Artist" : trackArtist;
+        _currentTrackImageUrl = imageUrl;
+        StateHasChanged();
+    }
+    
+    [JSInvokable]
+    public void OnPlayerError(string errorMessage)
+    {
+        Console.WriteLine($"Spotify Player Error: {errorMessage}");
+        _errorMessage = $"Spotify Player Error: {errorMessage}";
+        StateHasChanged();
+    }
+    
+    private void DismissError()
+    {
+        _errorMessage = "";
+        StateHasChanged();
+    }
+    
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            // Unregister from auth state changes
+            AuthService.OnAuthStateChanged -= HandleAuthStateChanged;
+            
+            if (_isPlayerReady)
+            {
+                await JSRuntime.InvokeVoidAsync("spotifyPlayer.disconnect");
+            }
+            
+            _dotNetReference?.Dispose();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error disposing player: {ex.Message}");
+        }
+    }
+}

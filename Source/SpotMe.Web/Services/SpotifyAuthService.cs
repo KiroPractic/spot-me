@@ -8,6 +8,10 @@ namespace SpotMe.Web.Services;
 
 public class SpotifyAuthService
 {
+    // Event for authentication state changes
+    public delegate void AuthStateChangedEventHandler(bool isAuthenticated);
+    public event AuthStateChangedEventHandler? OnAuthStateChanged;
+    
     private readonly IJSRuntime _jsRuntime;
     private readonly HttpClient _httpClient;
     private string? _clientId;
@@ -15,6 +19,7 @@ public class SpotifyAuthService
     private string? _accessToken;
     private DateTime _tokenExpiry = DateTime.MinValue;
     private SpotifyUserProfile? _cachedProfile;
+    private bool _previousAuthState = false;
 
     // Spotify requires these scopes to use the Web Playback SDK and access library
     private const string _requiredScopes = "streaming user-read-email user-read-private user-read-playback-state user-modify-playback-state user-library-read user-follow-read playlist-read-private playlist-read-collaborative";
@@ -184,6 +189,14 @@ public class SpotifyAuthService
             // If we have a valid token in memory, return it
             if (!string.IsNullOrEmpty(_accessToken) && DateTime.UtcNow < _tokenExpiry)
             {
+                // Check if auth state changed
+                bool currentAuthState = true;
+                if (currentAuthState != _previousAuthState)
+                {
+                    _previousAuthState = currentAuthState;
+                    OnAuthStateChanged?.Invoke(currentAuthState);
+                }
+                
                 return _accessToken;
             }
 
@@ -201,9 +214,26 @@ public class SpotifyAuthService
                         {
                             _accessToken = storedToken;
                             _tokenExpiry = storedExpiry;
+                            
+                            // Fire auth state change if needed
+                            bool currentAuthState = true;
+                            if (currentAuthState != _previousAuthState)
+                            {
+                                _previousAuthState = currentAuthState;
+                                OnAuthStateChanged?.Invoke(currentAuthState);
+                            }
+                            
                             return _accessToken;
                         }
                     }
+                }
+                
+                // Auth state is false
+                bool newAuthState = false;
+                if (newAuthState != _previousAuthState)
+                {
+                    _previousAuthState = newAuthState;
+                    OnAuthStateChanged?.Invoke(newAuthState);
                 }
             }
             catch (InvalidOperationException)
@@ -230,6 +260,8 @@ public class SpotifyAuthService
 
     public async Task StoreAccessTokenAsync(string accessToken, int expiresIn)
     {
+        bool wasAuthenticated = IsAuthenticated;
+        
         _accessToken = accessToken;
         _tokenExpiry = DateTime.UtcNow.AddSeconds(expiresIn);
 
@@ -250,6 +282,14 @@ public class SpotifyAuthService
             
             // Update IsAuthenticated property
             await _jsRuntime.InvokeVoidAsync("console.log", $"Updated authentication state: {IsAuthenticated}");
+            
+            // Fire auth state change if needed
+            if (!wasAuthenticated && IsAuthenticated)
+            {
+                _previousAuthState = true;
+                OnAuthStateChanged?.Invoke(true);
+                await _jsRuntime.InvokeVoidAsync("console.log", "Fired authentication state change event (now authenticated)");
+            }
         }
         catch (Exception ex)
         {
@@ -259,12 +299,22 @@ public class SpotifyAuthService
 
     public async Task ClearAccessTokenAsync()
     {
+        bool wasAuthenticated = IsAuthenticated;
+        
         _accessToken = null;
         _tokenExpiry = DateTime.MinValue;
         _cachedProfile = null;
 
         await _jsRuntime.InvokeVoidAsync("localStorage.removeItem", "spotify_access_token");
         await _jsRuntime.InvokeVoidAsync("localStorage.removeItem", "spotify_token_expiry");
+        
+        // Fire auth state change if needed
+        if (wasAuthenticated)
+        {
+            _previousAuthState = false;
+            OnAuthStateChanged?.Invoke(false);
+            await _jsRuntime.InvokeVoidAsync("console.log", "Fired authentication state change event (now logged out)");
+        }
     }
 
     public bool IsAuthenticated => !string.IsNullOrEmpty(_accessToken) && DateTime.UtcNow < _tokenExpiry;

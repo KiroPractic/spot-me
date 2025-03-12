@@ -16,7 +16,6 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="app.css" />
     <link rel="stylesheet" href="SpotMe.Web.styles.css" />
-    <link rel="stylesheet" href="css/navbar-fix.css" />
     <link rel="icon" type="image/png" href="favicon.png" />
     <title>SpotMe - Spotify Player</title>
     <HeadOutlet />
@@ -44,7 +43,17 @@
         </NotFound>
     </Router>
     <script src="_framework/blazor.web.js"></script>
-    <script src="js/navbar-fix.js"></script>
+    <script src="js/spotify-player.js"></script>
+    <script>
+        // Define the global callback before loading the SDK
+        window.onSpotifyWebPlaybackSDKReady = function() {
+            console.log('Spotify Web Playback SDK is ready');
+            if (window.spotifyPlayer && window.spotifyPlayer.onSDKReady) {
+                window.spotifyPlayer.onSDKReady();
+            }
+        };
+    </script>
+    <script src="https://sdk.scdn.co/spotify-player.js" async></script>
 </body>
 
 </html>

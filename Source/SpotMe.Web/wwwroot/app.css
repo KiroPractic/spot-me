@@ -523,6 +523,222 @@ a:hover {
     text-decoration: underline;
 }
 
+/* Spotify Player Styles */
+.spotify-player-container {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background-color: #181818;
+    border-top: 1px solid #333;
+    transition: transform 0.3s ease;
+    z-index: 1000;
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.spotify-player-container.hidden {
+    transform: translateY(100%);
+}
+
+.spotify-player-container.visible {
+    transform: translateY(0);
+}
+
+.spotify-player {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 2rem;
+    height: 80px;
+}
+
+.player-error {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    background-color: rgba(255, 0, 0, 0.1);
+    padding: 0.75rem 1rem;
+    border-radius: 4px;
+    color: #ff5555;
+}
+
+.player-error i {
+    font-size: 1.5rem;
+}
+
+.player-error span {
+    flex-grow: 1;
+}
+
+.error-dismiss {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: #ff5555;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+}
+
+.player-controls {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: 30%;
+}
+
+.playback-controls {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.control-btn {
+    background: none;
+    border: none;
+    color: #b3b3b3;
+    font-size: 1.25rem;
+    cursor: pointer;
+    transition: color 0.2s ease;
+}
+
+.control-btn:hover:not(:disabled) {
+    color: white;
+}
+
+.control-btn:disabled {
+    color: #555;
+    cursor: not-allowed;
+}
+
+.play-pause-btn {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 2.5rem;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.play-pause-btn:hover {
+    transform: scale(1.1);
+    color: #1DB954;
+}
+
+.player-track-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    width: 40%;
+}
+
+.track-artwork, .track-artwork-placeholder {
+    width: 56px;
+    height: 56px;
+    border-radius: 4px;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.track-artwork img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.track-artwork-placeholder {
+    background-color: #333;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.track-artwork-placeholder i {
+    font-size: 1.5rem;
+    color: #777;
+}
+
+.track-details {
+    flex-grow: 1;
+    overflow: hidden;
+}
+
+.track-name {
+    font-weight: 600;
+    font-size: 0.9rem;
+    margin-bottom: 0.25rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.track-artist {
+    font-size: 0.8rem;
+    color: #b3b3b3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.player-volume {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 20%;
+}
+
+.volume-icon {
+    color: #b3b3b3;
+    font-size: 1.25rem;
+}
+
+.volume-slider {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 4px;
+    border-radius: 2px;
+    background: #555;
+    outline: none;
+}
+
+.volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #1DB954;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.volume-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+    background: #1ED760;
+}
+
+.volume-slider::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #1DB954;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s ease;
+}
+
+.volume-slider::-moz-range-thumb:hover {
+    transform: scale(1.2);
+    background: #1ED760;
+}
+
+/* Add padding to the bottom of the page when player is visible */
+.app-layout {
+    padding-bottom: 80px;
+}
+
 /* Responsive Adjustments */
 @media (max-width: 768px) {
     .spotify-content {
@@ -539,5 +755,21 @@ a:hover {
     
     .playlists-grid {
         grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    }
+    
+    .spotify-player {
+        padding: 1rem;
+    }
+    
+    .player-track-info {
+        width: 50%;
+    }
+    
+    .player-controls {
+        width: 25%;
+    }
+    
+    .player-volume {
+        width: 20%;
     }
 }
