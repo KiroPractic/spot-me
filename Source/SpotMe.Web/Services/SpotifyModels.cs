@@ -3,6 +3,65 @@ using System.Text.Json.Serialization;
 
 namespace SpotMe.Web.Services
 {
+    // Model for Spotify playlists
+    public class SpotifyPlaylist
+    {
+        public string? Id { get; set; }
+        public string? Name { get; set; }
+        public string? Description { get; set; }
+        
+        [JsonPropertyName("public")]
+        public bool IsPublic { get; set; }
+        
+        [JsonPropertyName("collaborative")]
+        public bool IsCollaborative { get; set; }
+        
+        [JsonPropertyName("snapshot_id")]
+        public string? SnapshotId { get; set; }
+        
+        public SpotifyUser? Owner { get; set; }
+        public List<ImageInfo>? Images { get; set; }
+        
+        [JsonPropertyName("followers")]
+        public FollowersInfo? Followers { get; set; }
+        
+        [JsonPropertyName("tracks")]
+        public PlaylistTracksRef? Tracks { get; set; }
+        
+        [JsonPropertyName("external_urls")]
+        public ExternalUrls? ExternalUrls { get; set; }
+    }
+    
+    public class SpotifyUser
+    {
+        public string? Id { get; set; }
+        
+        [JsonPropertyName("display_name")]
+        public string? DisplayName { get; set; }
+        
+        [JsonPropertyName("external_urls")]
+        public ExternalUrls? ExternalUrls { get; set; }
+    }
+    
+    public class PlaylistTracksRef
+    {
+        public string? Href { get; set; }
+        public int Total { get; set; }
+    }
+    
+    public class PaginatedPlaylistsResponse
+    {
+        public string? Href { get; set; }
+        public int Limit { get; set; }
+        public string? Next { get; set; }
+        public int Offset { get; set; }
+        public string? Previous { get; set; }
+        public int Total { get; set; }
+        
+        [JsonPropertyName("items")]
+        public List<SpotifyPlaylist>? Items { get; set; }
+    }
+    
     // Model for Spotify user profile
     public class SpotifyUserProfile
     {
@@ -37,8 +96,8 @@ namespace SpotMe.Web.Services
     public class ImageInfo
     {
         public string? Url { get; set; }
-        public int Height { get; set; }
-        public int Width { get; set; }
+        public int? Height { get; set; }
+        public int? Width { get; set; }
     }
     
     public class ExternalUrls

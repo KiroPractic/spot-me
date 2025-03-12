@@ -416,6 +416,44 @@ public class SpotifyAuthService
         }
     }
     
+    // Get user's playlists with details
+    public async Task<List<SpotifyPlaylist>?> GetPlaylistsAsync(int limit = 20, int offset = 0)
+    {
+        var token = await GetAccessTokenAsync();
+        if (string.IsNullOrEmpty(token))
+        {
+            return null;
+        }
+        
+        try 
+        {
+            var request = new HttpRequestMessage(
+                HttpMethod.Get, 
+                $"https://api.spotify.com/v1/me/playlists?limit={limit}&offset={offset}"
+            );
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            
+            var response = await _httpClient.SendAsync(request);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                var paginatedResponse = JsonSerializer.Deserialize<PaginatedPlaylistsResponse>(content, options);
+                
+                return paginatedResponse?.Items;
+            }
+            
+            await _jsRuntime.InvokeVoidAsync("console.error", $"Failed to get playlists: {response.StatusCode}");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            await _jsRuntime.InvokeVoidAsync("console.error", $"Error getting playlists: {ex.Message}");
+            return null;
+        }
+    }
+    
     // Get count of artists the user is following
     public async Task<int> GetFollowedArtistsCountAsync()
     {

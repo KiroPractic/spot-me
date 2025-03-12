@@ -374,6 +374,143 @@ a:hover {
     to { transform: rotate(360deg); }
 }
 
+/* Playlist Page Styles */
+.playlists-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem 1rem;
+}
+
+.playlists-container h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+    color: #FFFFFF;
+}
+
+.loading-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 0;
+}
+
+.loading-container .spinner-border {
+    width: 3rem;
+    height: 3rem;
+    margin-bottom: 1rem;
+}
+
+.playlists-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 1.5rem;
+}
+
+.playlist-card {
+    background-color: #181818;
+    border-radius: 8px;
+    overflow: hidden;
+    transition: background-color 0.3s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.playlist-card:hover {
+    background-color: #282828;
+}
+
+.playlist-image {
+    width: 100%;
+    aspect-ratio: 1;
+    overflow: hidden;
+}
+
+.playlist-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.playlist-image-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #333;
+}
+
+.playlist-image-placeholder i {
+    font-size: 4rem;
+    color: #787878;
+}
+
+.playlist-details {
+    padding: 1rem;
+}
+
+.playlist-name {
+    font-size: 1rem;
+    font-weight: 700;
+    margin: 0 0 0.5rem 0;
+    color: #FFFFFF;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.playlist-description {
+    font-size: 0.85rem;
+    color: #B3B3B3;
+    margin-bottom: 0.75rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.playlist-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    font-size: 0.8rem;
+}
+
+.playlist-tracks,
+.playlist-followers,
+.playlist-collaborative,
+.playlist-private {
+    background-color: rgba(255, 255, 255, 0.1);
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    color: #B3B3B3;
+}
+
+.playlist-collaborative {
+    background-color: rgba(29, 185, 84, 0.2);
+    color: #1DB954;
+}
+
+.playlist-private {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.open-spotify-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #1DB954;
+    font-size: 0.9rem;
+    font-weight: 500;
+    padding: 0.4rem 0;
+}
+
+.open-spotify-btn:hover {
+    color: #1ED760;
+}
+
 /* Responsive Adjustments */
 @media (max-width: 768px) {
     .spotify-content {
@@ -386,5 +523,9 @@ a:hover {
     
     .player-container {
         padding: 20px;
+    }
+    
+    .playlists-grid {
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     }
 }
