@@ -36,7 +36,7 @@
                 <i class="bi bi-music-note"></i>
                 <div class="stat-info">
                     <h3>Playlists</h3>
-                    @if (isLoadingStats)
+                    @if (_isLoadingStats)
                     {
                         <p><span class="loading-spinner"></span></p>
                     }
@@ -51,7 +51,7 @@
                 <i class="bi bi-heart"></i>
                 <div class="stat-info">
                     <h3>Liked Songs</h3>
-                    @if (isLoadingStats)
+                    @if (_isLoadingStats)
                     {
                         <p><span class="loading-spinner"></span></p>
                     }
@@ -66,7 +66,7 @@
                 <i class="bi bi-person"></i>
                 <div class="stat-info">
                     <h3>Following</h3>
-                    @if (isLoadingStats)
+                    @if (_isLoadingStats)
                     {
                         <p><span class="loading-spinner"></span></p>
                     }
@@ -84,20 +84,20 @@
         <p>Coming soon...</p>
     </div>
     
-    @if (!string.IsNullOrEmpty(errorMessage))
+    @if (!string.IsNullOrEmpty(_errorMessage))
     {
-        <div class="error-message">@errorMessage</div>
+        <div class="error-message">@_errorMessage</div>
     }
 </div>
 
 @code {
-    private string? errorMessage;
+    private string? _errorMessage;
     private string ProfileName { get; set; } = "Spotify User";
     private string? ProfileImageUrl { get; set; }
     private int PlaylistsCount { get; set; } = 0;
     private int LikedSongsCount { get; set; } = 0;
     private int FollowingCount { get; set; } = 0;
-    private bool isLoadingStats = true;
+    private bool _isLoadingStats = true;
     
     protected override async Task OnInitializedAsync()
     {
@@ -118,16 +118,9 @@
             var profile = await AuthService.GetUserProfileAsync();
             if (profile != null)
             {
-                // Debug profile data
-                await JSRuntime.InvokeVoidAsync("console.log", $"Home page received profile - DisplayName: '{profile.DisplayName}', Email: '{profile.Email}'");
-                
-                // Extract display name, with fallback
-                ProfileName = !string.IsNullOrEmpty(profile.DisplayName) 
-                    ? profile.DisplayName 
-                    : (!string.IsNullOrEmpty(profile.Email) ? profile.Email : "Spotify User");
-                    
+               
+                ProfileName =  profile.DisplayName!;
                 ProfileImageUrl = profile.Images?.FirstOrDefault()?.Url;
-                await JSRuntime.InvokeVoidAsync("console.log", $"Profile loaded: {ProfileName}");
             }
             
             // Start loading user stats in parallel
@@ -136,7 +129,7 @@
         catch (Exception ex)
         {
             Console.Error.WriteLine($"Error in Home initialization: {ex.Message}");
-            errorMessage = $"Error: {ex.Message}";
+            _errorMessage = $"Error: {ex.Message}";
         }
     }
     
@@ -144,7 +137,7 @@
     {
         try
         {
-            isLoadingStats = true;
+            _isLoadingStats = true;
             
             // Create tasks to load stats in parallel
             var playlistsTask = AuthService.GetPlaylistsCountAsync();
@@ -161,55 +154,23 @@
             catch (Exception ex) 
             { 
                 await JSRuntime.InvokeVoidAsync("console.error", $"Error getting liked songs count: {ex.Message}");
-                LikedSongsCount = 0;  // Fallback value
             }
             
             try { FollowingCount = await followingTask; } 
             catch (Exception ex) 
             { 
                 await JSRuntime.InvokeVoidAsync("console.error", $"Error getting following count: {ex.Message}");
-                FollowingCount = 0;  // Fallback value
             }
             
             await JSRuntime.InvokeVoidAsync("console.log", $"Stats loaded - Playlists: {PlaylistsCount}, Liked Songs: {LikedSongsCount}, Following: {FollowingCount}");
             
-            isLoadingStats = false;
+            _isLoadingStats = false;
             StateHasChanged();
         }
         catch (Exception ex)
         {
             await JSRuntime.InvokeVoidAsync("console.error", $"Error loading stats: {ex.Message}");
-            isLoadingStats = false;
-        }
-    }
-    
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-        {
-            try 
-            {
-                // Log for debugging
-                await JSRuntime.InvokeVoidAsync("console.log", "Home page rendered");
-                await JSRuntime.InvokeVoidAsync("console.log", $"Profile name: {ProfileName}");
-                await JSRuntime.InvokeVoidAsync("console.log", $"Profile image: {ProfileImageUrl ?? "none"}");
-                
-                // Check token again after rendering (in case it wasn't available during server prerendering)
-                var token = await AuthService.GetAccessTokenAsync();
-                if (string.IsNullOrEmpty(token))
-                {
-                    await JSRuntime.InvokeVoidAsync("console.log", "No token found after render, redirecting");
-                    // Use JS to navigate to avoid potential serialization issues with NavigationManager
-                    await JSRuntime.InvokeVoidAsync("eval", "window.location.href = '/auth';");
-                    return;
-                }
-            }
-            catch (Exception ex)
-            {
-                await JSRuntime.InvokeVoidAsync("console.error", $"Error in OnAfterRenderAsync: {ex.Message}");
-                errorMessage = $"Error: {ex.Message}";
-                StateHasChanged();
-            }
+            _isLoadingStats = false;
         }
     }
 }

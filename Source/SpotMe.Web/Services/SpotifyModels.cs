@@ -8,6 +8,7 @@ namespace SpotMe.Web.Services
     {
         public string? Id { get; set; }
         
+        // The Spotify API returns display_name in snake_case
         [JsonPropertyName("display_name")]
         public string? DisplayName { get; set; }
         
@@ -21,6 +22,11 @@ namespace SpotMe.Web.Services
         public ExternalUrls? ExternalUrls { get; set; }
         
         public string? SpotifyUrl => ExternalUrls?.Spotify;
+        
+        public override string ToString()
+        {
+            return $"Id: {Id}, DisplayName: {DisplayName}, Email: {Email}, Images: {(Images != null ? Images.Count : 0)} images";
+        }
     }
     
     public class FollowersInfo

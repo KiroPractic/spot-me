@@ -1,3 +1,6 @@
+/* Import Bootstrap Icons */
+@import url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css");
+
 /* Global Reset and Base Styles */
 html, body {
     font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
@@ -205,6 +208,131 @@ html, body {
     text-align: center;
     color: #B3B3B3;
     padding: 20px;
+}
+
+/* Navbar Styles */
+.top-navbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background-color: #181818;
+    padding: 1rem 2rem;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.navbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.spotify-icon {
+    color: #1DB954;
+    font-size: 1.5rem;
+}
+
+.navbar-brand span {
+    font-weight: 700;
+    font-size: 1.25rem;
+    color: white;
+}
+
+.nav-links {
+    display: flex;
+    gap: 1.5rem;
+}
+
+.nav-links a {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #b3b3b3;
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.2s ease;
+}
+
+.nav-links a:hover, 
+.nav-links a.active {
+    color: white;
+}
+
+.nav-links a i {
+    font-size: 1.25rem;
+}
+
+.user-section {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.user-section .spotify-button {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+}
+
+.user-profile {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.profile-img, .profile-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    overflow: hidden;
+    object-fit: cover;
+}
+
+.profile-icon {
+    font-size: 1.5rem;
+    color: #b3b3b3;
+}
+
+.username {
+    font-weight: 500;
+    color: white;
+}
+
+.logout-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    background: transparent;
+    border: 1px solid #b3b3b3;
+    color: #b3b3b3;
+    padding: 0.4rem 0.8rem;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.logout-btn:hover {
+    border-color: white;
+    color: white;
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.main-content {
+    padding: 1rem;
+    padding-top: 5rem; /* Space for fixed navbar */
+}
+
+.main-content.with-navbar {
+    padding-top: 5rem;
+}
+
+.app-layout {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
 }
 
 /* Error UI */

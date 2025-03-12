@@ -1,0 +1,235 @@
+@using SpotMe.Web.Services
+@using SpotMe.Web.Models
+@implements IDisposable
+@inject IJSRuntime JsRuntime
+@inject SpotifyAuthService AuthService
+@inject NavigationManager NavigationManager
+@rendermode InteractiveServer
+
+<div class="top-navbar">
+    <div class="navbar-brand">
+        <i class="bi bi-spotify spotify-icon"></i>
+        <span>SpotMe</span>
+    </div>
+    
+    <div class="nav-links">
+        <a href="/" class="@GetActiveClass("/")">
+            <i class="bi bi-house-door"></i>
+            <span>Home</span>
+        </a>
+        <a href="/about" class="@GetActiveClass("/about")">
+            <i class="bi bi-info-circle"></i>
+            <span>About</span>
+        </a>
+        @if (_isAuthenticated)
+        {
+            <a href="/search" class="@GetActiveClass("/search")">
+                <i class="bi bi-search"></i>
+                <span>Search</span>
+            </a>
+            <a href="/playlists" class="@GetActiveClass("/playlists")">
+                <i class="bi bi-music-note-list"></i>
+                <span>Playlists</span>
+            </a>
+        }
+    </div>
+    
+    <div class="user-section">
+        @if (_isAuthenticated)
+        {
+            <div class="user-profile">
+                @if (!string.IsNullOrEmpty(_userProfile?.ImageUrl))
+                {
+                    <img src="@_userProfile.ImageUrl" alt="@(_userProfile.DisplayName ?? "User")" class="profile-img" />
+                }
+                else
+                {
+                    <i class="bi bi-person-circle profile-icon"></i>
+                }
+                <span class="username">@GetCurrentUsername()</span>
+            </div>
+            
+            <button @onclick="HandleLogout" class="logout-btn">
+                <i class="bi bi-box-arrow-right"></i>
+                <span>Logout</span>
+            </button>
+        }
+        else
+        {
+            <a href="/auth" class="spotify-button">
+                <i class="bi bi-spotify"></i>
+                <span>Sign in with Spotify</span>
+            </a>
+        }
+    </div>
+</div>
+
+@code {
+    private bool _isAuthenticated;
+    private UserProfile? _userProfile;
+
+    protected override void OnInitialized()
+    {
+        NavigationManager.LocationChanged += OnLocationChanged;
+    }
+
+    private async void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        await CheckAuthenticationStatus();
+    }
+
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= OnLocationChanged;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckAuthenticationStatus();
+    }
+    
+    private async Task CheckAuthenticationStatus()
+    {
+        try
+        {
+            Console.WriteLine("TopNavbar - CheckAuthenticationStatus: Starting check");
+            var token = await AuthService.GetAccessTokenAsync();
+            _isAuthenticated = !string.IsNullOrEmpty(token);
+            Console.WriteLine($"TopNavbar - CheckAuthenticationStatus: isAuthenticated = {_isAuthenticated}");
+            
+            if (_isAuthenticated)
+            {
+                // Always fetch the profile when authenticated
+                Console.WriteLine("TopNavbar - CheckAuthenticationStatus: Fetching Spotify profile");
+                var spotifyProfile = await AuthService.GetUserProfileAsync();
+                
+                if (spotifyProfile != null)
+                {
+                    Console.WriteLine($"TopNavbar - CheckAuthenticationStatus: Profile received - DisplayName: '{spotifyProfile.DisplayName}', Email: '{spotifyProfile.Email}'");
+                    
+                    string displayName = !string.IsNullOrEmpty(spotifyProfile.DisplayName) 
+                        ? spotifyProfile.DisplayName 
+                        : (!string.IsNullOrEmpty(spotifyProfile.Email) ? spotifyProfile.Email : "Spotify User");
+                    
+                    Console.WriteLine($"TopNavbar - CheckAuthenticationStatus: Using display name: '{displayName}'");
+                    
+                    _userProfile = new UserProfile
+                    {
+                        DisplayName = displayName,
+                        Email = spotifyProfile.Email,
+                        ImageUrl = spotifyProfile.Images?.FirstOrDefault()?.Url
+                    };
+                }
+                else
+                {
+                    Console.WriteLine("TopNavbar - CheckAuthenticationStatus: No profile received from Spotify API, using fallback");
+                    _userProfile = new UserProfile
+                    {
+                        DisplayName = "Spotify User",
+                        Email = "user@example.com"
+                    };
+                }
+            }
+            else
+            {
+                Console.WriteLine("TopNavbar - CheckAuthenticationStatus: Not authenticated");
+                _userProfile = null;
+            }
+            
+            Console.WriteLine($"TopNavbar - CheckAuthenticationStatus: Final profile - {(_userProfile != null ? $"DisplayName: '{_userProfile.DisplayName}'" : "null")}");
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            await Console.Error.WriteLineAsync($"Error checking authentication: {ex.Message}");
+        }
+    }
+    
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                var directToken = await JsRuntime.InvokeAsync<string>("localStorage.getItem", "spotify_access_token");
+                if (!string.IsNullOrEmpty(directToken))
+                {
+                    _isAuthenticated = true;
+                    
+                    // Force an immediate profile fetch
+                    await FetchUserProfileAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                await Console.Error.WriteLineAsync($"Error in TopNavbar: {ex.Message}");
+            }
+        }
+    }
+    
+    private string GetActiveClass(string path)
+    {
+        var currentUri = NavigationManager.Uri;
+        if (path == "/" && currentUri.EndsWith("/"))
+            return "active";
+            
+        return currentUri.Contains(path) ? "active" : "";
+    }
+    
+    private string GetCurrentUsername()
+    {
+        // Try to use the profile from state first
+        if (_userProfile != null && !string.IsNullOrEmpty(_userProfile.DisplayName))
+        {
+            return _userProfile.DisplayName;
+        }
+        
+        // If we have a token but no profile yet, fetch it right away
+        if (_isAuthenticated && _userProfile == null)
+        {
+            // This will trigger an async update
+            _ = FetchUserProfileAsync();
+        }
+        
+        // Default fallback
+        return "Spotify User";
+    }
+    
+    private async Task FetchUserProfileAsync()
+    {
+        try 
+        {
+            var spotifyProfile = await AuthService.GetUserProfileAsync();
+            if (spotifyProfile != null)
+            {
+                string displayName = !string.IsNullOrEmpty(spotifyProfile.DisplayName) 
+                    ? spotifyProfile.DisplayName 
+                    : (!string.IsNullOrEmpty(spotifyProfile.Email) ? spotifyProfile.Email : "Spotify User");
+                
+                _userProfile = new UserProfile
+                {
+                    DisplayName = displayName,
+                    Email = spotifyProfile.Email,
+                    ImageUrl = spotifyProfile.Images?.FirstOrDefault()?.Url
+                };
+                
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error fetching user profile: {ex.Message}");
+        }
+    }
+    
+    private async Task HandleLogout()
+    {
+        await AuthService.ClearAccessTokenAsync();
+        _isAuthenticated = false;
+        _userProfile = null;
+        StateHasChanged();
+        NavigationManager.NavigateTo("/auth");
+    }
+    
+    public bool IsAuthenticated => _isAuthenticated;
+}

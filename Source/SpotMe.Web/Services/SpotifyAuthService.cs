@@ -14,6 +14,7 @@ public class SpotifyAuthService
     private string? _redirectUri;
     private string? _accessToken;
     private DateTime _tokenExpiry = DateTime.MinValue;
+    private SpotifyUserProfile? _cachedProfile;
 
     // Spotify requires these scopes to use the Web Playback SDK and access library
     private const string _requiredScopes = "streaming user-read-email user-read-private user-read-playback-state user-modify-playback-state user-library-read user-follow-read playlist-read-private playlist-read-collaborative";
@@ -260,6 +261,7 @@ public class SpotifyAuthService
     {
         _accessToken = null;
         _tokenExpiry = DateTime.MinValue;
+        _cachedProfile = null;
 
         await _jsRuntime.InvokeVoidAsync("localStorage.removeItem", "spotify_access_token");
         await _jsRuntime.InvokeVoidAsync("localStorage.removeItem", "spotify_token_expiry");
@@ -267,11 +269,19 @@ public class SpotifyAuthService
 
     public bool IsAuthenticated => !string.IsNullOrEmpty(_accessToken) && DateTime.UtcNow < _tokenExpiry;
     
-    public async Task<SpotifyUserProfile?> GetUserProfileAsync()
+    public async Task<SpotifyUserProfile?> GetUserProfileAsync(bool forceRefresh = false)
     {
+        // Return cached profile if available and not forcing refresh
+        if (!forceRefresh && _cachedProfile != null)
+        {
+            Console.WriteLine($"GetUserProfileAsync: Using cached profile - {_cachedProfile.DisplayName}");
+            return _cachedProfile;
+        }
+        
         var token = await GetAccessTokenAsync();
         if (string.IsNullOrEmpty(token))
         {
+            Console.WriteLine("GetUserProfileAsync: No token available");
             return null;
         }
         
@@ -281,18 +291,28 @@ public class SpotifyAuthService
             var request = new HttpRequestMessage(HttpMethod.Get, "https://api.spotify.com/v1/me");
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
             
+            Console.WriteLine("GetUserProfileAsync: Sending request to Spotify API");
             var response = await _httpClient.SendAsync(request);
             
             if (response.IsSuccessStatusCode)
             {
                 var content = await response.Content.ReadAsStringAsync();
                 
+                // Configure deserialization options
                 var options = new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true
                 };
                 
                 var profile = JsonSerializer.Deserialize<SpotifyUserProfile>(content, options);
+                
+                if (profile != null)
+                {
+                    Console.WriteLine($"GetUserProfileAsync: Retrieved profile - DisplayName: '{profile.DisplayName}'");
+                    // Cache the profile
+                    _cachedProfile = profile;
+                }
+                
                 return profile;
             }
             

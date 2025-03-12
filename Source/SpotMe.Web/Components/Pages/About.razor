@@ -1,0 +1,201 @@
+@page "/about"
+
+<PageTitle>SpotMe - About</PageTitle>
+
+<div class="about-container">
+    <div class="about-header">
+        <h1>About SpotMe</h1>
+        <p class="tagline">Your personal Spotify experience</p>
+    </div>
+    
+    <div class="about-section">
+        <div class="about-card">
+            <div class="icon-container">
+                <i class="bi bi-music-note-beamed"></i>
+            </div>
+            <h2>Music Player</h2>
+            <p>
+                SpotMe is built using the Spotify Web API and Web Playback SDK to provide a seamless music playback experience.
+                Sign in with your Spotify account to access your music library, playlists, and discover new music.
+            </p>
+        </div>
+        
+        <div class="about-card">
+            <div class="icon-container">
+                <i class="bi bi-code-slash"></i>
+            </div>
+            <h2>Technology</h2>
+            <p>
+                Built with Blazor WebAssembly, SpotMe uses C# for the backend and modern web technologies for the frontend.
+                The application integrates with Spotify's API to deliver a smooth and responsive music experience.
+            </p>
+        </div>
+        
+        <div class="about-card">
+            <div class="icon-container">
+                <i class="bi bi-lock"></i>
+            </div>
+            <h2>Security</h2>
+            <p>
+                SpotMe uses OAuth 2.0 for secure authentication with Spotify.
+                Your credentials are never stored on our servers, and all API requests are made securely.
+            </p>
+        </div>
+    </div>
+    
+    <div class="features-section">
+        <h2>Features</h2>
+        <ul class="feature-list">
+            <li>
+                <i class="bi bi-check-circle"></i>
+                <span>Browse your Spotify library</span>
+            </li>
+            <li>
+                <i class="bi bi-check-circle"></i>
+                <span>View and manage your playlists</span>
+            </li>
+            <li>
+                <i class="bi bi-check-circle"></i>
+                <span>Discover new music based on your taste</span>
+            </li>
+            <li>
+                <i class="bi bi-check-circle"></i>
+                <span>Full playback controls integrated with Spotify</span>
+            </li>
+            <li>
+                <i class="bi bi-check-circle"></i>
+                <span>Seamless authentication with your Spotify account</span>
+            </li>
+        </ul>
+    </div>
+    
+    <div class="about-footer">
+        <p>
+            SpotMe is not affiliated with Spotify AB. Spotify is a registered trademark of Spotify AB.
+        </p>
+    </div>
+</div>
+
+<style>
+    .about-container {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 2rem;
+    }
+    
+    .about-header {
+        text-align: center;
+        margin-bottom: 3rem;
+    }
+    
+    .about-header h1 {
+        font-size: 3rem;
+        color: #1DB954;
+        margin-bottom: 0.5rem;
+    }
+    
+    .tagline {
+        font-size: 1.2rem;
+        color: #b3b3b3;
+    }
+    
+    .about-section {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 2rem;
+        margin-bottom: 3rem;
+    }
+    
+    .about-card {
+        background-color: #282828;
+        border-radius: 8px;
+        padding: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+    
+    .icon-container {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        background-color: rgba(29, 185, 84, 0.1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 1rem;
+    }
+    
+    .icon-container i {
+        font-size: 2.5rem;
+        color: #1DB954;
+    }
+    
+    .about-card h2 {
+        font-size: 1.5rem;
+        color: white;
+        margin-bottom: 1rem;
+    }
+    
+    .about-card p {
+        color: #b3b3b3;
+        line-height: 1.6;
+    }
+    
+    .features-section {
+        background-color: #282828;
+        border-radius: 8px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+    }
+    
+    .features-section h2 {
+        font-size: 1.8rem;
+        color: white;
+        margin-bottom: 1.5rem;
+        text-align: center;
+    }
+    
+    .feature-list {
+        list-style: none;
+        padding: 0;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 1rem;
+    }
+    
+    .feature-list li {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        color: #b3b3b3;
+        font-size: 1.1rem;
+    }
+    
+    .feature-list li i {
+        color: #1DB954;
+        font-size: 1.25rem;
+    }
+    
+    .about-footer {
+        text-align: center;
+        color: #777;
+        font-size: 0.9rem;
+        margin-top: 3rem;
+    }
+    
+    @@media (max-width: 768px) {
+        .about-section {
+            grid-template-columns: 1fr;
+        }
+        
+        .feature-list {
+            grid-template-columns: 1fr;
+        }
+        
+        .about-header h1 {
+            font-size: 2.5rem;
+        }
+    }
+</style>
