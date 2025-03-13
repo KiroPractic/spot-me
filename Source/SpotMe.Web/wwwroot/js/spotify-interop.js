@@ -301,11 +301,252 @@ window.restoreScrollPosition = function(elementClass, position) {
     container.scrollTop = position;
 };
 
+// Store the .NET reference for window scroll events
+let dotNetWindowScrollRef = null;
+let windowScrollThrottleTimeout = null;
+
+// Function to define the callback
+window.defineWindowScrollCallback = function(dotNetRef) {
+    dotNetWindowScrollRef = dotNetRef;
+    console.log("Window scroll callback defined");
+};
+
+// Function to set up the window scroll handler
+window.setupWindowScrollHandler = function() {
+    // Remove any existing handlers first to avoid duplicates
+    window.removeEventListener('scroll', handleWindowScroll);
+    
+    // Add the event listener
+    window.addEventListener('scroll', handleWindowScroll, { passive: true });
+    console.log("Window scroll handler set up");
+    
+    // Do an initial check
+    setTimeout(checkIfNearBottom, 1000);
+};
+
+// Function to remove window scroll handler
+window.removeWindowScrollHandler = function() {
+    // Remove the event listener
+    window.removeEventListener('scroll', handleWindowScroll);
+    
+    // Clear the reference
+    dotNetWindowScrollRef = null;
+    
+    console.log("Window scroll handler removed");
+};
+
+// Handle window scroll events
+function handleWindowScroll() {
+    // Throttle scroll events to avoid excessive calls
+    if (!windowScrollThrottleTimeout) {
+        windowScrollThrottleTimeout = setTimeout(() => {
+            windowScrollThrottleTimeout = null;
+            checkIfNearBottom();
+        }, 300);
+    }
+}
+
+// Check if we're near the bottom of the page
+function checkIfNearBottom() {
+    try {
+        if (dotNetWindowScrollRef && isNearPageBottom()) {
+            console.log("Near bottom, invoking .NET method");
+            dotNetWindowScrollRef.invokeMethodAsync('HandleWindowScroll')
+                .catch(error => console.error("Error invoking HandleWindowScroll:", error));
+        }
+    } catch (error) {
+        console.error("Error in checkIfNearBottom:", error);
+    }
+}
+
+// Function to check if we're near the bottom of the page
+window.isNearPageBottom = function() {
+    try {
+        // Get window scroll information
+        const scrollTop = window.scrollY || document.documentElement.scrollTop;
+        const windowHeight = window.innerHeight;
+        const documentHeight = Math.max(
+            document.body.scrollHeight, 
+            document.documentElement.scrollHeight,
+            document.body.offsetHeight, 
+            document.documentElement.offsetHeight,
+            document.body.clientHeight, 
+            document.documentElement.clientHeight
+        );
+        
+        // Calculate distance from bottom of viewport to bottom of document
+        const distanceFromBottom = documentHeight - (scrollTop + windowHeight);
+        
+        // Consider near bottom if within 20% of window height
+        const threshold = windowHeight * 0.2;
+        const isNear = distanceFromBottom <= threshold;
+        
+        if (isNear) {
+            console.log(`Near page bottom: ${distanceFromBottom}px from bottom`);
+        }
+        
+        return isNear;
+    } catch (error) {
+        console.error("Error checking if near page bottom:", error);
+        return false;
+    }
+};
+
 // Safe error handler
 window.addEventListener('error', (event) => {
     console.error('Error caught by SpotMe:', event.error);
     return false;
 });
+
+// Get current window scroll position
+window.getScrollPosition = function() {
+    return window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+};
+
+// Variables for scroll management
+let isPreventingScrollReset = false;
+let lastKnownScrollPosition = 0;
+let scrollInterval = null;
+
+// Restore scroll position
+window.restoreScrollPosition = function(position) {
+    console.log(`Restoring scroll position to ${position}px`);
+    
+    // Immediate attempt
+    window.scrollTo(0, position);
+    
+    // For some browsers, we need to delay the restoration slightly
+    setTimeout(() => {
+        window.scrollTo(0, position);
+    }, 10);
+};
+
+// Variables for auto-loading tracks on scroll
+let autoLoadTracksRef = null;
+let autoLoadScrollHandler = null;
+let isLoadingMoreTracks = false;
+let lastScrollCheckTime = 0;
+
+// Set up auto-load tracks on scroll
+window.setupAutoLoadTracks = function(dotNetRef) {
+    // Store the .NET reference
+    autoLoadTracksRef = dotNetRef;
+    
+    // Remove any existing handler to avoid duplicates
+    if (autoLoadScrollHandler) {
+        window.removeEventListener('scroll', autoLoadScrollHandler);
+    }
+    
+    // Create a new handler
+    autoLoadScrollHandler = function() {
+        // Throttle scroll checks to avoid too many calls
+        const now = Date.now();
+        if (now - lastScrollCheckTime < 200) return; // Only check every 200ms
+        lastScrollCheckTime = now;
+        
+        // Don't check if we're already loading
+        if (isLoadingMoreTracks) return;
+        
+        // Check if we're near the bottom
+        if (isNearPageBottom()) {
+            console.log('Near bottom, loading more tracks...');
+            isLoadingMoreTracks = true;
+            
+            // Call the .NET method
+            autoLoadTracksRef.invokeMethodAsync('OnScrollNearBottom')
+                .then(() => {
+                    // Reset loading flag after a small delay to avoid multiple loads
+                    setTimeout(() => {
+                        isLoadingMoreTracks = false;
+                    }, 500);
+                })
+                .catch(error => {
+                    console.error('Error invoking OnScrollNearBottom:', error);
+                    isLoadingMoreTracks = false;
+                });
+        }
+    };
+    
+    // Add the scroll event listener
+    window.addEventListener('scroll', autoLoadScrollHandler, { passive: true });
+    console.log('Auto-load tracks scroll handler set up');
+};
+
+// Clean up auto-load tracks
+window.cleanupAutoLoadTracks = function() {
+    // Remove the scroll event listener
+    if (autoLoadScrollHandler) {
+        window.removeEventListener('scroll', autoLoadScrollHandler);
+        autoLoadScrollHandler = null;
+    }
+    
+    // Clear the .NET reference
+    autoLoadTracksRef = null;
+    console.log('Auto-load tracks cleaned up');
+};
+
+// Prevent page from scrolling to top during updates
+window.preventScrollReset = function(position) {
+    // Use provided position or get current one
+    lastKnownScrollPosition = position !== undefined ? 
+        position : (window.scrollY || document.documentElement.scrollTop);
+    
+    console.log(`Preventing scroll reset, position: ${lastKnownScrollPosition}px`);
+    
+    // Set flag to prevent unwanted scroll reset
+    isPreventingScrollReset = true;
+    
+    // Immediately ensure we're at the right position
+    window.scrollTo(0, lastKnownScrollPosition);
+    
+    // Set up an interval to maintain position during DOM updates
+    if (scrollInterval) {
+        clearInterval(scrollInterval);
+    }
+    
+    scrollInterval = setInterval(() => {
+        if (isPreventingScrollReset) {
+            const currentScroll = window.scrollY || document.documentElement.scrollTop;
+            if (Math.abs(currentScroll - lastKnownScrollPosition) > 50) {
+                console.log(`Correcting scroll from ${currentScroll}px to ${lastKnownScrollPosition}px`);
+                window.scrollTo(0, lastKnownScrollPosition);
+            }
+        }
+    }, 10); // Check every 10ms
+};
+
+// Maintain scroll position after the DOM has changed
+window.maintainScrollPosition = function(position) {
+    console.log(`Maintaining scroll position at ${position}px`);
+    
+    // Force the browser to respect our scroll position
+    window.scrollTo(0, position);
+    
+    // Continue to enforce this position briefly to handle any post-render adjustments
+    const enforceDeadline = Date.now() + 1000; // Enforce for 1 second max
+    const enforceInterval = setInterval(() => {
+        const currentPosition = window.scrollY || document.documentElement.scrollTop;
+        if (Math.abs(currentPosition - position) > 50) {
+            window.scrollTo(0, position);
+        }
+        
+        // Stop enforcing after the deadline
+        if (Date.now() > enforceDeadline) {
+            clearInterval(enforceInterval);
+        }
+    }, 50);
+};
+
+// Resume normal scrolling behavior
+window.resumeScrolling = function() {
+    console.log('Resuming normal scrolling behavior');
+    isPreventingScrollReset = false;
+    
+    if (scrollInterval) {
+        clearInterval(scrollInterval);
+        scrollInterval = null;
+    }
+};
 
 // Safe script loading
 window.SpotMe.loadScript = function(url) {
