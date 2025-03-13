@@ -43,7 +43,7 @@
                         </p>
                     }
                     <div class="playlist-meta">
-                        <span class="playlist-tracks">@_selectedPlaylist.Tracks?.Total tracks</span>
+                        <span class="playlist-tracks">@(_selectedPlaylist.Tracks?.Total) tracks</span>
                         @if (_selectedPlaylist.Followers != null && _selectedPlaylist.Followers.Total > 0)
                         {
                             <span class="playlist-followers">@_selectedPlaylist.Followers.Total followers</span>
@@ -224,7 +224,7 @@
                                 </p>
                             }
                             <div class="playlist-meta">
-                                <span class="playlist-tracks">@playlist.Tracks?.Total tracks</span>
+                                <span class="playlist-tracks">@(playlist.Tracks?.Total) tracks</span>
                                 @if (playlist.Followers != null && playlist.Followers.Total > 0)
                                 {
                                     <span class="playlist-followers">@playlist.Followers.Total followers</span>
@@ -663,6 +663,11 @@
                 _tracksOffset = 0;
                 _hasMoreTracks = true;
                 await LoadMoreTracks();
+                
+                // Setup scroll listener after render
+                _dotNetRef = DotNetObjectReference.Create(this);
+                await Task.Delay(500); // Wait for the UI to render
+                await JSRuntime.InvokeVoidAsync("setupScrollListener", "tracks-table-container", _dotNetRef);
             }
         }
     }
@@ -678,6 +683,9 @@
         
         try
         {
+            // Get scroll position before loading more tracks
+            var scrollPosition = await JSRuntime.InvokeAsync<double>("saveScrollPosition", "tracks-table-container");
+            
             _isLoadingTracks = true;
             StateHasChanged();
             
@@ -726,6 +734,13 @@
                 _hasMoreTracks = false;
                 await JSRuntime.InvokeVoidAsync("console.log", "No more tracks available");
             }
+            
+            // Allow UI to render
+            StateHasChanged();
+            await Task.Delay(50);
+            
+            // Restore scroll position
+            await JSRuntime.InvokeVoidAsync("restoreScrollPosition", "tracks-table-container", scrollPosition);
         }
         catch (Exception ex)
         {
@@ -738,12 +753,34 @@
         }
     }
     
+    [JSInvokable]
+    public async Task OnScroll()
+    {
+        if (!_isLoadingTracks && _hasMoreTracks)
+        {
+            await LoadMoreTracks();
+        }
+    }
+    
     // Disposal implementation for cleaning up resources
     public void Dispose()
     {
-        // This method is needed for the IDisposable interface, but we
-        // don't need it anymore since virtualization is handled by Blazor
+        try 
+        {
+            // Clean up the scroll listener
+            JSRuntime.InvokeVoidAsync("cleanupScrollListener");
+            
+            // Dispose of DotNetReference
+            _dotNetRef?.Dispose();
+        }
+        catch (Exception ex)
+        {
+            // Log any errors during disposal
+            Console.WriteLine($"Error during disposal: {ex.Message}");
+        }
     }
+    
+    private DotNetObjectReference<Playlists>? _dotNetRef;
     
 
     private async Task LoadPlaylistsAsync()

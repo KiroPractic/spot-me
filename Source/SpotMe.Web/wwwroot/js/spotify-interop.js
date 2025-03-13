@@ -55,80 +55,250 @@ window.isNearBottom = function(elementId) {
     return false;
 };
 
-// Setup a scroll event listener for infinite scrolling
-window.setupScrollListener = function(elementId, dotnetRef) {
-    const container = document.querySelector(`.${elementId}`);
+// Setup scroll listener to auto-load more tracks when near bottom
+window.setupTrackScrollListener = function(dotNetRef) {
+    // Find the tracks table container
+    const container = document.querySelector('.tracks-table-container');
     if (!container) {
-        console.log(`Element with class ${elementId} not found for scroll listener`);
+        console.log('Tracks table container not found');
         return;
     }
     
-    console.log(`Setting up scroll listener on ${elementId}`);
+    console.log('Setting up track scroll listener');
     
-    // Get all scrollable parents
-    const scrollables = [];
-    let currentEl = container;
-    
-    // Check the element and all its parents for scrollability
-    while (currentEl) {
-        const style = window.getComputedStyle(currentEl);
-        const overflowY = style.overflowY;
+    // Add scroll event listener to the container
+    container.addEventListener('scroll', function() {
+        // Check if we're near the bottom
+        const threshold = 100; // px from bottom to trigger loading
+        const position = container.scrollTop + container.clientHeight;
+        const height = container.scrollHeight;
         
-        if ((overflowY === 'auto' || overflowY === 'scroll') && 
-            currentEl.scrollHeight > currentEl.clientHeight) {
-            scrollables.push(currentEl);
+        if (position + threshold >= height) {
+            console.log('Scroll reached bottom, calling load more');
+            dotNetRef.invokeMethodAsync('LoadMoreFromScroll');
         }
+    });
+    
+    // Also listen for window scroll events
+    window.addEventListener('scroll', function() {
+        // Check if the table is visible in the viewport
+        const rect = container.getBoundingClientRect();
+        const isVisible = (
+            rect.top >= 0 &&
+            rect.left >= 0 &&
+            rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
+            rect.right <= (window.innerWidth || document.documentElement.clientWidth)
+        );
         
-        currentEl = currentEl.parentElement;
+        if (isVisible) {
+            // Calculate if we're at the bottom
+            const threshold = 100;
+            const position = container.scrollTop + container.clientHeight;
+            const height = container.scrollHeight;
+            
+            if (position + threshold >= height) {
+                console.log('Window scroll reached bottom of tracks, calling load more');
+                dotNetRef.invokeMethodAsync('LoadMoreFromScroll');
+            }
+        }
+    });
+};
+
+// Setup a scroll event listener for infinite scrolling
+window.setupScrollListener = function(elementId, dotnetRef) {
+    // Find the scrollable container. Try multiple options.
+    let scrollableContainer;
+    
+    // First try the specified element
+    const specificContainer = document.querySelector(`.${elementId}`);
+    if (specificContainer) {
+        scrollableContainer = specificContainer;
+        console.log(`Found specific container with class ${elementId}`);
+    } else {
+        // Look for any of these containers
+        const potentialContainers = [
+            '.tracks-table-container',
+            '.playlist-tracks-container',
+            '.playlist-detail-view',
+            'main'
+        ];
+        
+        for (const selector of potentialContainers) {
+            const element = document.querySelector(selector);
+            if (element) {
+                const style = window.getComputedStyle(element);
+                const hasScroll = (style.overflowY === 'auto' || style.overflowY === 'scroll');
+                const isScrollable = element.scrollHeight > element.clientHeight;
+                
+                if (hasScroll && isScrollable) {
+                    scrollableContainer = element;
+                    console.log(`Found scrollable container: ${selector}`);
+                    break;
+                }
+            }
+        }
     }
     
-    console.log(`Found ${scrollables.length} scrollable parents to monitor`);
+    // If we still don't have a container, use the window
+    if (!scrollableContainer) {
+        console.log('No scrollable container found, using window as fallback');
+        scrollableContainer = window;
+    }
     
-    // Force checking once even without scrolling to load if needed
+    console.log(`Setting up scroll listener on ${scrollableContainer === window ? 'window' : scrollableContainer.className || 'element'}`);
+    
+    // Store the last position to prevent continuous loading
+    let lastPosition = 0;
+    let isLoadingMore = false;
+    
+    // Function to check if we should load more content
+    function shouldLoadMore(scrollable) {
+        // Don't load more if already loading
+        if (isLoadingMore) {
+            console.log('Already loading more tracks, skipping');
+            return false;
+        }
+        
+        // Calculate how far we are from the bottom
+        let position, total, bottom, scrollPercentage;
+        
+        if (scrollable === window) {
+            // For window scrolling
+            position = window.scrollY + window.innerHeight;
+            total = document.documentElement.scrollHeight;
+        } else {
+            // For element scrolling
+            position = scrollable.scrollTop + scrollable.clientHeight;
+            total = scrollable.scrollHeight;
+        }
+        
+        bottom = total - position;
+        scrollPercentage = (position / total) * 100;
+        
+        console.log(`Scroll check - position: ${position}, total: ${total}, bottom: ${bottom}px, percentage: ${scrollPercentage.toFixed(1)}%`);
+        
+        // Only consider loading more if we're 80% through the content
+        if (scrollPercentage > 80 && Math.abs(position - lastPosition) > 20) {
+            console.log(`Near bottom: ${bottom}px from bottom, ${scrollPercentage.toFixed(1)}% scrolled`);
+            lastPosition = position;
+            return true;
+        }
+        
+        return false;
+    }
+    
+    // Load one batch initially if needed
+    let initialLoadDone = false;
     setTimeout(() => {
-        console.log('Initial scroll check');
-        dotnetRef.invokeMethodAsync('OnScroll');
+        if (!initialLoadDone) {
+            console.log('Initial content check');
+            initialLoadDone = true;
+            isLoadingMore = true;
+            dotnetRef.invokeMethodAsync('OnScroll').then(() => {
+                isLoadingMore = false;
+            });
+        }
     }, 500);
     
     // Throttle the scroll event to avoid too many calls
     let scrollTimeout;
     
-    // Add scroll listener to all scrollable parents
-    for (const scrollable of scrollables) {
-        console.log(`Adding scroll listener to ${scrollable.className || 'element'}`);
-        
-        scrollable.addEventListener('scroll', function() {
-            if (scrollTimeout) {
-                clearTimeout(scrollTimeout);
-            }
-            
-            scrollTimeout = setTimeout(function() {
-                console.log('Scroll event fired, calling .NET method');
-                dotnetRef.invokeMethodAsync('OnScroll');
-            }, 200); // 200ms delay
-        });
-    }
-    
-    // Add scroll listener to window for good measure (in case of browser scrolling)
-    window.addEventListener('scroll', function() {
+    // Add scroll listener to the container element
+    const scrollHandler = function() {
         if (scrollTimeout) {
             clearTimeout(scrollTimeout);
         }
         
         scrollTimeout = setTimeout(function() {
-            console.log('Window scroll event fired, calling .NET method');
-            dotnetRef.invokeMethodAsync('OnScroll');
+            if (shouldLoadMore(scrollableContainer)) {
+                console.log('Loading more from scroll');
+                isLoadingMore = true;
+                dotnetRef.invokeMethodAsync('OnScroll').then(() => {
+                    isLoadingMore = false;
+                });
+            }
         }, 200); // 200ms delay
-    });
+    };
     
-    // Also check periodically in case the scroll event doesn't fire
-    const intervalId = setInterval(function() {
-        console.log('Periodic scroll check');
-        dotnetRef.invokeMethodAsync('OnScroll');
-    }, 2000); // Every 2 seconds
+    // Add the scroll event listener
+    if (scrollableContainer === window) {
+        window.addEventListener('scroll', scrollHandler);
+    } else {
+        scrollableContainer.addEventListener('scroll', scrollHandler);
+    }
     
-    // Store the interval ID for cleanup
-    window.SpotMe.scrollCheckIntervalId = intervalId;
+    // Store scroll listener reference and cleanup info for disposal
+    window.SpotMe.scrollData = {
+        container: scrollableContainer,
+        handler: scrollHandler
+    };
+};
+
+// Cleanup scroll listener
+window.cleanupScrollListener = function() {
+    if (window.SpotMe && window.SpotMe.scrollData) {
+        console.log('Cleaning up scroll listener');
+        
+        const { container, handler } = window.SpotMe.scrollData;
+        
+        if (container === window) {
+            window.removeEventListener('scroll', handler);
+        } else {
+            container.removeEventListener('scroll', handler);
+        }
+        
+        window.SpotMe.scrollData = null;
+    }
+};
+
+// Function to save scroll position
+window.saveScrollPosition = function(elementClass) {
+    // Try to find element with the specific class
+    let container = document.querySelector(`.${elementClass}`);
+    
+    // If not found, look for scrollable containers
+    if (!container) {
+        console.log(`Element with class ${elementClass} not found, trying to find scrollable container`);
+        const scrollables = Array.from(document.querySelectorAll('.tracks-table-container, .playlist-tracks-container, main'));
+        container = scrollables.find(el => {
+            const style = window.getComputedStyle(el);
+            return (style.overflowY === 'auto' || style.overflowY === 'scroll') && 
+                   el.scrollHeight > el.clientHeight;
+        });
+    }
+    
+    if (!container) {
+        console.log(`No suitable scrollable container found`);
+        return 0;
+    }
+    
+    console.log(`Saving scroll position from ${container.className}: ${container.scrollTop}`);
+    return container.scrollTop;
+};
+
+// Function to restore scroll position
+window.restoreScrollPosition = function(elementClass, position) {
+    // Try to find element with the specific class
+    let container = document.querySelector(`.${elementClass}`);
+    
+    // If not found, look for scrollable containers
+    if (!container) {
+        console.log(`Element with class ${elementClass} not found, trying to find scrollable container`);
+        const scrollables = Array.from(document.querySelectorAll('.tracks-table-container, .playlist-tracks-container, main'));
+        container = scrollables.find(el => {
+            const style = window.getComputedStyle(el);
+            return (style.overflowY === 'auto' || style.overflowY === 'scroll') && 
+                   el.scrollHeight > el.clientHeight;
+        });
+    }
+    
+    if (!container) {
+        console.log(`No suitable scrollable container found for restoring position`);
+        return;
+    }
+    
+    console.log(`Restoring scroll position to ${container.className}: ${position}`);
+    container.scrollTop = position;
 };
 
 // Safe error handler
