@@ -2,7 +2,7 @@
 @using SpotMe.Web.Services
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JSRuntime
-@inject SpotifyAuthService AuthService
+@inject SpotifyService AuthService
 @rendermode InteractiveServer
 
 <PageTitle>SpotMe - Home</PageTitle>
@@ -42,7 +42,7 @@
                     }
                     else
                     {
-                        <p>@PlaylistsCount</p>
+                        <p class="clickable-stat" @onclick="NavigateToPlaylists">@PlaylistsCount</p>
                     }
                 </div>
             </div>
@@ -57,7 +57,7 @@
                     }
                     else
                     {
-                        <p>@LikedSongsCount</p>
+                        <p class="clickable-stat" @onclick="NavigateToLikedSongs">@LikedSongsCount</p>
                     }
                 </div>
             </div>
@@ -173,6 +173,16 @@
             _isLoadingStats = false;
         }
     }
+    
+    private void NavigateToPlaylists()
+    {
+        NavigationManager.NavigateTo("/playlists");
+    }
+    
+    private void NavigateToLikedSongs()
+    {
+        NavigationManager.NavigateTo("/playlists/liked");
+    }
 }
 
 <style>
@@ -266,6 +276,16 @@
         margin: 0 0 0.25rem 0;
         font-size: 0.9rem;
         color: #b3b3b3;
+    }
+    
+    .clickable-stat {
+        cursor: pointer;
+        transition: color 0.2s;
+    }
+    
+    .clickable-stat:hover {
+        color: #1DB954;
+        text-decoration: underline;
     }
     
     .stat-info p {

@@ -1,6 +1,9 @@
 @using SpotMe.Web.Services
+@using System.Net.Http
+@using System.Net.Http.Headers
+@using System.Text.Json
 @inject IJSRuntime JSRuntime
-@inject SpotifyAuthService AuthService
+@inject SpotifyService SpotifyService
 @implements IAsyncDisposable
 @rendermode InteractiveServer
 
@@ -77,11 +80,17 @@
     protected override async Task OnInitializedAsync()
     {
         // Check if user is authenticated
-        var token = await AuthService.GetAccessTokenAsync();
+        var token = await SpotifyService.GetAccessTokenAsync();
         _isVisible = !string.IsNullOrEmpty(token);
         
+        // If user is authenticated, try to fetch the current playback
+        if (_isVisible)
+        {
+            await FetchCurrentPlaybackState();
+        }
+        
         // Register for authentication events
-        AuthService.OnAuthStateChanged += HandleAuthStateChanged;
+        SpotifyService.OnAuthStateChanged += HandleAuthStateChanged;
     }
     
     private async void HandleAuthStateChanged(bool isAuthenticated)
@@ -92,6 +101,9 @@
         {
             // Reinitialize the player when authentication state changes
             await InitializePlayer();
+            
+            // Also fetch the current playback state
+            await FetchCurrentPlaybackState();
         }
         
         await InvokeAsync(StateHasChanged);
@@ -109,6 +121,16 @@
             if (_isVisible)
             {
                 await InitializePlayer();
+                
+                // Schedule a delayed retry of fetching playback state
+                // This is useful because sometimes the Spotify API needs a moment after authentication
+                // to properly recognize the user's session
+                _ = Task.Delay(2000).ContinueWith(async _ => 
+                {
+                    Console.WriteLine("Executing delayed playback state fetch");
+                    await FetchCurrentPlaybackState();
+                    await InvokeAsync(StateHasChanged);
+                });
             }
         }
     }
@@ -119,7 +141,7 @@
         {
             _dotNetReference = DotNetObjectReference.Create(this);
             
-            var token = await AuthService.GetAccessTokenAsync();
+            var token = await SpotifyService.GetAccessTokenAsync();
             if (!string.IsNullOrEmpty(token))
             {
                 Console.WriteLine("Initializing Spotify player with token");
@@ -218,10 +240,65 @@
     }
     
     [JSInvokable]
-    public void OnPlayerReady()
+    public async Task OnPlayerReady()
     {
         _isPlayerReady = true;
+        
+        // Fetch the current playback state when the player is ready
+        await FetchCurrentPlaybackState();
+        
         StateHasChanged();
+    }
+    
+    private async Task FetchCurrentPlaybackState(bool retryOnNoContent = true)
+    {
+        try
+        {
+            Console.WriteLine("FetchCurrentPlaybackState: Starting via SpotifyService");
+            
+            // First try to get current playback
+            var playbackState = await SpotifyService.GetCurrentPlaybackStateAsync();
+            
+            if (playbackState != null)
+            {
+                // Update the UI with current playback info
+                _isPlaying = playbackState.IsPlaying;
+                _currentTrackName = playbackState.TrackName;
+                _currentTrackArtist = playbackState.ArtistName;
+                _currentTrackImageUrl = playbackState.ImageUrl;
+                
+                Console.WriteLine($"FetchCurrentPlaybackState: Updated playback state: {(_isPlaying ? "Playing" : "Paused")} - {_currentTrackName} by {_currentTrackArtist}");
+                await InvokeAsync(StateHasChanged);
+                return;
+            }
+            
+            // If no current playback and retryOnNoContent is true, try to get recently played tracks
+            if (retryOnNoContent)
+            {
+                Console.WriteLine("FetchCurrentPlaybackState: No current playback, trying recently played");
+                var recentTrack = await SpotifyService.GetRecentlyPlayedTrackAsync();
+                
+                if (recentTrack != null)
+                {
+                    // Update the UI with recently played track info
+                    _isPlaying = recentTrack.IsPlaying;
+                    _currentTrackName = recentTrack.TrackName;
+                    _currentTrackArtist = recentTrack.ArtistName;
+                    _currentTrackImageUrl = recentTrack.ImageUrl;
+                    
+                    Console.WriteLine($"FetchCurrentPlaybackState: Using recently played: {_currentTrackName} by {_currentTrackArtist}");
+                    await InvokeAsync(StateHasChanged);
+                }
+                else
+                {
+                    Console.WriteLine("FetchCurrentPlaybackState: No recently played tracks found either");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"FetchCurrentPlaybackState: Exception: {ex.Message}");
+        }
     }
     
     [JSInvokable]
@@ -253,7 +330,7 @@
         try
         {
             // Unregister from auth state changes
-            AuthService.OnAuthStateChanged -= HandleAuthStateChanged;
+            SpotifyService.OnAuthStateChanged -= HandleAuthStateChanged;
             
             if (_isPlayerReady)
             {

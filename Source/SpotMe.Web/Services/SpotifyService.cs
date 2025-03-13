@@ -6,7 +6,7 @@ using System.Text.Json;
 
 namespace SpotMe.Web.Services;
 
-public class SpotifyAuthService
+public class SpotifyService
 {
     // Event for authentication state changes
     public delegate void AuthStateChangedEventHandler(bool isAuthenticated);
@@ -22,13 +22,13 @@ public class SpotifyAuthService
     private bool _previousAuthState = false;
 
     // Spotify requires these scopes to use the Web Playback SDK and access library
-    private const string _requiredScopes = "streaming user-read-email user-read-private user-read-playback-state user-modify-playback-state user-library-read user-follow-read playlist-read-private playlist-read-collaborative";
+    private const string _requiredScopes = "streaming user-read-email user-read-private user-read-playback-state user-modify-playback-state user-library-read user-follow-read playlist-read-private playlist-read-collaborative user-read-recently-played";
     
     // Properties to expose for debugging
     public string? ClientId => _clientId;
     public string RequestedScopes => _requiredScopes;
 
-    public SpotifyAuthService(IJSRuntime jsRuntime, HttpClient httpClient)
+    public SpotifyService(IJSRuntime jsRuntime, HttpClient httpClient)
     {
         _jsRuntime = jsRuntime;
         _httpClient = httpClient;
@@ -430,6 +430,100 @@ public class SpotifyAuthService
         }
     }
     
+    // Get user's saved/liked tracks
+    public async Task<List<PlaylistTrack>?> GetLikedTracksAsync(int limit = 50, int offset = 0)
+    {
+        var token = await GetAccessTokenAsync();
+        if (string.IsNullOrEmpty(token))
+        {
+            return null;
+        }
+        
+        try 
+        {
+            // Spotify API has a maximum limit of 50 for this endpoint
+            int validLimit = Math.Min(limit, 50);
+            
+            var request = new HttpRequestMessage(
+                HttpMethod.Get, 
+                $"https://api.spotify.com/v1/me/tracks?limit={validLimit}&offset={offset}"
+            );
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            
+            var response = await _httpClient.SendAsync(request);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                
+                // Log the raw content for debugging
+                await _jsRuntime.InvokeVoidAsync("console.log", "Liked tracks API response:", content.Substring(0, Math.Min(500, content.Length)));
+                
+                try 
+                {
+                    var options = new JsonSerializerOptions 
+                    { 
+                        PropertyNameCaseInsensitive = true
+                    };
+                    
+                    // The Spotify API for saved tracks returns data in a slightly different format
+                    // Parse it manually to match our PlaylistTrack structure
+                    using (JsonDocument doc = JsonDocument.Parse(content))
+                    {
+                        var tracks = new List<PlaylistTrack>();
+                        var root = doc.RootElement;
+                        
+                        if (root.TryGetProperty("items", out var items))
+                        {
+                            foreach (var item in items.EnumerateArray())
+                            {
+                                var track = new PlaylistTrack();
+                                
+                                // Get the added_at property
+                                if (item.TryGetProperty("added_at", out var addedAt))
+                                {
+                                    if (DateTime.TryParse(addedAt.GetString(), out var parsedDate))
+                                    {
+                                        track.AddedAt = parsedDate;
+                                    }
+                                }
+                                
+                                // Get the track object
+                                if (item.TryGetProperty("track", out var trackElement))
+                                {
+                                    var spotifyTrack = JsonSerializer.Deserialize<SpotifyTrack>(
+                                        trackElement.GetRawText(), options);
+                                    
+                                    track.Track = spotifyTrack;
+                                }
+                                
+                                tracks.Add(track);
+                            }
+                        }
+                        
+                        return tracks;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    await _jsRuntime.InvokeVoidAsync("console.error", $"Error parsing liked tracks: {ex.Message}");
+                    return null;
+                }
+            }
+            
+            // Get error details from response
+            var errorContent = await response.Content.ReadAsStringAsync();
+            await _jsRuntime.InvokeVoidAsync("console.error", $"Failed to get liked tracks: {response.StatusCode}");
+            await _jsRuntime.InvokeVoidAsync("console.error", $"Error details: {errorContent}");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            await _jsRuntime.InvokeVoidAsync("console.error", $"Error getting liked tracks: {ex.Message}");
+            return null;
+        }
+    }
+    
     // Get user's playlists count
     public async Task<int> GetPlaylistsCountAsync()
     {
@@ -504,6 +598,100 @@ public class SpotifyAuthService
         }
     }
     
+    // Get user's playlists with a virtual Liked Songs playlist at the top
+    public async Task<List<SpotifyPlaylist>?> GetPlaylistsWithLikedSongs(int limit = 20, int offset = 0)
+    {
+        var token = await GetAccessTokenAsync();
+        if (string.IsNullOrEmpty(token))
+        {
+            return null;
+        }
+        
+        try 
+        {
+            // Create parallel tasks to fetch playlists and liked songs count
+            var playlistsTask = GetPlaylistsAsync(limit, offset);
+            var likedSongsCountTask = GetSavedTracksCountAsync();
+            
+            await Task.WhenAll(playlistsTask, likedSongsCountTask);
+            
+            var playlists = await playlistsTask;
+            var likedSongsCount = await likedSongsCountTask;
+            
+            if (playlists == null)
+            {
+                playlists = new List<SpotifyPlaylist>();
+            }
+            
+            // Add a virtual Liked Songs playlist at the top
+            playlists.Insert(0, new SpotifyPlaylist 
+            {
+                Id = "liked",
+                Name = "Liked Songs",
+                Description = "Songs you've liked on Spotify",
+                Images = new List<ImageInfo> 
+                { 
+                    new ImageInfo 
+                    { 
+                        Url = "https://misc.scdn.co/liked-songs/liked-songs-300.png",
+                        Height = 300,
+                        Width = 300
+                    } 
+                },
+                Tracks = new PlaylistTracksRef { Total = likedSongsCount },
+                ExternalUrls = new ExternalUrls { Spotify = "https://open.spotify.com/collection/tracks" }
+            });
+            
+            return playlists;
+        }
+        catch (Exception ex)
+        {
+            await _jsRuntime.InvokeVoidAsync("console.error", $"Error getting playlists with liked songs: {ex.Message}");
+            return null;
+        }
+    }
+    
+    // Get tracks for a specific playlist
+    public async Task<List<PlaylistTrack>?> GetPlaylistTracksAsync(string playlistId, int limit = 50, int offset = 0)
+    {
+        var token = await GetAccessTokenAsync();
+        if (string.IsNullOrEmpty(token) || string.IsNullOrEmpty(playlistId))
+        {
+            return null;
+        }
+        
+        try 
+        {
+            // Make sure limit isn't larger than what the API supports (usually 50 or 100)
+            int validLimit = Math.Min(limit, 50);
+            
+            var request = new HttpRequestMessage(
+                HttpMethod.Get, 
+                $"https://api.spotify.com/v1/playlists/{playlistId}/tracks?limit={validLimit}&offset={offset}"
+            );
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            
+            var response = await _httpClient.SendAsync(request);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                var paginatedResponse = JsonSerializer.Deserialize<PaginatedPlaylistTracksResponse>(content, options);
+                
+                return paginatedResponse?.Items;
+            }
+            
+            await _jsRuntime.InvokeVoidAsync("console.error", $"Failed to get playlist tracks: {response.StatusCode}");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            await _jsRuntime.InvokeVoidAsync("console.error", $"Error getting playlist tracks: {ex.Message}");
+            return null;
+        }
+    }
+    
     // Get count of artists the user is following
     public async Task<int> GetFollowedArtistsCountAsync()
     {
@@ -564,6 +752,209 @@ public class SpotifyAuthService
         {
             await _jsRuntime.InvokeVoidAsync("console.error", $"Error getting followed artists: {ex.Message}");
             return 0;
+        }
+    }
+
+    // Fetch current playback state
+    public async Task<PlaybackStateData?> GetCurrentPlaybackStateAsync()
+    {
+        try
+        {
+            Console.WriteLine("GetCurrentPlaybackStateAsync: Starting to fetch playback state");
+            var token = await GetAccessTokenAsync();
+            if (string.IsNullOrEmpty(token))
+            {
+                Console.WriteLine("GetCurrentPlaybackStateAsync: No token available");
+                return null;
+            }
+            
+            Console.WriteLine("GetCurrentPlaybackStateAsync: Token available, calling Spotify API");
+            var request = new HttpRequestMessage(HttpMethod.Get, "https://api.spotify.com/v1/me/player");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            
+            var response = await _httpClient.SendAsync(request);
+            
+            Console.WriteLine($"GetCurrentPlaybackStateAsync: Player API response status: {response.StatusCode}");
+            
+            if (response.StatusCode == System.Net.HttpStatusCode.NoContent)
+            {
+                Console.WriteLine("GetCurrentPlaybackStateAsync: No active playback session found");
+                return null;
+            }
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"GetCurrentPlaybackStateAsync: Received response of length {content.Length}");
+                
+                using var doc = JsonDocument.Parse(content);
+                var root = doc.RootElement;
+                
+                // Debug log the JSON keys at the root level
+                Console.WriteLine("GetCurrentPlaybackStateAsync: JSON root keys: " + string.Join(", ", root.EnumerateObject().Select(p => p.Name)));
+                
+                var playbackState = new PlaybackStateData();
+                
+                if (root.TryGetProperty("is_playing", out var isPlayingProp))
+                {
+                    playbackState.IsPlaying = isPlayingProp.GetBoolean();
+                    Console.WriteLine($"GetCurrentPlaybackStateAsync: is_playing = {playbackState.IsPlaying}");
+                    
+                    if (root.TryGetProperty("item", out var item))
+                    {
+                        Console.WriteLine("GetCurrentPlaybackStateAsync: Found 'item' property");
+                        
+                        if (item.TryGetProperty("name", out var nameProp))
+                        {
+                            playbackState.TrackName = nameProp.GetString() ?? "Not Playing";
+                        }
+                        
+                        if (item.TryGetProperty("artists", out var artistsArray))
+                        {
+                            var artistNames = new List<string>();
+                            foreach (var artist in artistsArray.EnumerateArray())
+                            {
+                                if (artist.TryGetProperty("name", out var artistNameProp))
+                                {
+                                    artistNames.Add(artistNameProp.GetString() ?? "");
+                                }
+                            }
+                            playbackState.ArtistName = string.Join(", ", artistNames);
+                        }
+                        
+                        if (item.TryGetProperty("album", out var album) && 
+                            album.TryGetProperty("images", out var imagesArray))
+                        {
+                            var images = imagesArray.EnumerateArray();
+                            if (images.Any())
+                            {
+                                var firstImage = images.First();
+                                if (firstImage.TryGetProperty("url", out var urlProp))
+                                {
+                                    playbackState.ImageUrl = urlProp.GetString() ?? "";
+                                }
+                            }
+                        }
+                        
+                        Console.WriteLine($"GetCurrentPlaybackStateAsync: Parsed playback state: {(playbackState.IsPlaying ? "Playing" : "Paused")} - {playbackState.TrackName} by {playbackState.ArtistName}");
+                        return playbackState;
+                    }
+                    else
+                    {
+                        Console.WriteLine("GetCurrentPlaybackStateAsync: 'item' property not found in response");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("GetCurrentPlaybackStateAsync: 'is_playing' property not found in response");
+                }
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                Console.Error.WriteLine($"GetCurrentPlaybackStateAsync: Error fetching current playback: {response.StatusCode}");
+                Console.Error.WriteLine($"GetCurrentPlaybackStateAsync: Error details: {errorContent}");
+            }
+            
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"GetCurrentPlaybackStateAsync: Exception: {ex.Message}");
+            return null;
+        }
+    }
+    
+    // Fetch recently played tracks
+    public async Task<PlaybackStateData?> GetRecentlyPlayedTrackAsync()
+    {
+        try
+        {
+            Console.WriteLine("GetRecentlyPlayedTrackAsync: Starting to fetch recently played tracks");
+            var token = await GetAccessTokenAsync();
+            if (string.IsNullOrEmpty(token))
+            {
+                Console.WriteLine("GetRecentlyPlayedTrackAsync: No token available");
+                return null;
+            }
+            
+            var request = new HttpRequestMessage(HttpMethod.Get, "https://api.spotify.com/v1/me/player/recently-played?limit=1");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            
+            var response = await _httpClient.SendAsync(request);
+            
+            Console.WriteLine($"GetRecentlyPlayedTrackAsync: API response status: {response.StatusCode}");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                using var doc = JsonDocument.Parse(content);
+                var root = doc.RootElement;
+                
+                if (root.TryGetProperty("items", out var items) && items.GetArrayLength() > 0)
+                {
+                    var firstItem = items[0];
+                    var result = new PlaybackStateData
+                    {
+                        IsPlaying = false // Recently played track is not currently playing
+                    };
+                    
+                    if (firstItem.TryGetProperty("track", out var track))
+                    {
+                        if (track.TryGetProperty("name", out var nameProp))
+                        {
+                            result.TrackName = $"Last played: {nameProp.GetString() ?? "Not Playing"}";
+                        }
+                        
+                        if (track.TryGetProperty("artists", out var artistsArray))
+                        {
+                            var artistNames = new List<string>();
+                            foreach (var artist in artistsArray.EnumerateArray())
+                            {
+                                if (artist.TryGetProperty("name", out var artistNameProp))
+                                {
+                                    artistNames.Add(artistNameProp.GetString() ?? "");
+                                }
+                            }
+                            result.ArtistName = string.Join(", ", artistNames);
+                        }
+                        
+                        if (track.TryGetProperty("album", out var album) && 
+                            album.TryGetProperty("images", out var imagesArray))
+                        {
+                            var images = imagesArray.EnumerateArray();
+                            if (images.Any())
+                            {
+                                var firstImage = images.First();
+                                if (firstImage.TryGetProperty("url", out var urlProp))
+                                {
+                                    result.ImageUrl = urlProp.GetString() ?? "";
+                                }
+                            }
+                        }
+                        
+                        Console.WriteLine($"GetRecentlyPlayedTrackAsync: Found recently played track: {result.TrackName} by {result.ArtistName}");
+                        return result;
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("GetRecentlyPlayedTrackAsync: No recently played tracks found");
+                }
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                Console.Error.WriteLine($"GetRecentlyPlayedTrackAsync: Error fetching recently played tracks: {response.StatusCode}");
+                Console.Error.WriteLine($"GetRecentlyPlayedTrackAsync: Error details: {errorContent}");
+            }
+            
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"GetRecentlyPlayedTrackAsync: Exception: {ex.Message}");
+            return null;
         }
     }
 }

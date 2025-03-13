@@ -2,7 +2,7 @@
 @using SpotMe.Web.Services
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JSRuntime
-@inject SpotifyAuthService AuthService
+@inject SpotifyService SpotifyService
 @rendermode InteractiveServer
 
 <PageTitle>Authenticating with Spotify...</PageTitle>
@@ -111,7 +111,7 @@
                 if (fragmentParams.TryGetValue("expires_in", out var expiresInStr) && int.TryParse(expiresInStr, out var expiresIn))
                 {
                     // Store token in the service
-                    await AuthService.StoreAccessTokenAsync(accessToken, expiresIn);
+                    await SpotifyService.StoreAccessTokenAsync(accessToken, expiresIn);
                     
                     // Clear the fragment
                     await JSRuntime.InvokeVoidAsync("history.replaceState", null, "", "/callback");

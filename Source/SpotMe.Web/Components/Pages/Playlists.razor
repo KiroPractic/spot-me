@@ -1,94 +1,632 @@
 @page "/playlists"
+@page "/playlists/{PlaylistId}"
 @using SpotMe.Web.Services
+@using System.Threading
+@using Microsoft.AspNetCore.Components.Web.Virtualization
 @rendermode InteractiveServer
-@inject SpotifyAuthService AuthService
+@inject SpotifyService AuthService
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JSRuntime
+@implements IDisposable
 
 <PageTitle>My Playlists - SpotMe</PageTitle>
 
 <div class="container playlists-container">
-    <h1>My Playlists</h1>
-
-    @if (!_isAuthenticated)
+    @if (_isPlaylistDetailView && _selectedPlaylist != null)
     {
-        <div class="alert alert-warning">
-            <p>Please <a href="/auth">log in with Spotify</a> to view your playlists.</p>
-        </div>
-    }
-    else if (_loading)
-    {
-        <div class="loading-container">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Loading...</span>
+        <div class="playlist-detail-view">
+            <div class="back-link">
+                <a href="/playlists" class="btn btn-outline-light btn-sm">
+                    <i class="bi bi-arrow-left"></i> Back to Playlists
+                </a>
             </div>
-            <p>Loading your playlists...</p>
-        </div>
-    }
-    else if (_playlists == null || _playlists.Count == 0)
-    {
-        <div class="alert alert-info">
-            <p>You don't have any playlists yet.</p>
-        </div>
-    }
-    else
-    {
-        <div class="playlists-grid">
-            @foreach (var playlist in _playlists)
-            {
-                <div class="playlist-card">
-                    <div class="playlist-image">
-                        @if (playlist.Images != null && playlist.Images.Count > 0)
+            
+            <div class="playlist-detail-header">
+                <div class="playlist-detail-image">
+                    @if (_selectedPlaylist.Images != null && _selectedPlaylist.Images.Count > 0)
+                    {
+                        <img src="@_selectedPlaylist.Images[0].Url" alt="@_selectedPlaylist.Name" />
+                    }
+                    else
+                    {
+                        <div class="playlist-image-placeholder">
+                            <i class="bi bi-music-note-list"></i>
+                        </div>
+                    }
+                </div>
+                <div class="playlist-detail-info">
+                    <h1>@_selectedPlaylist.Name</h1>
+                    @if (!string.IsNullOrEmpty(_selectedPlaylist.Description))
+                    {
+                        <p class="playlist-description">
+                            @((MarkupString)CleanDescription(_selectedPlaylist.Description))
+                        </p>
+                    }
+                    <div class="playlist-meta">
+                        <span class="playlist-tracks">@_selectedPlaylist.Tracks?.Total tracks</span>
+                        @if (_selectedPlaylist.Followers != null && _selectedPlaylist.Followers.Total > 0)
                         {
-                            <img src="@playlist.Images[0].Url" alt="@playlist.Name" />
+                            <span class="playlist-followers">@_selectedPlaylist.Followers.Total followers</span>
                         }
-                        else
+                        @if (_selectedPlaylist.IsCollaborative)
                         {
-                            <div class="playlist-image-placeholder">
-                                <i class="bi bi-music-note-list"></i>
-                            </div>
+                            <span class="playlist-collaborative">Collaborative</span>
+                        }
+                        @if (!_selectedPlaylist.IsPublic)
+                        {
+                            <span class="playlist-private">Private</span>
                         }
                     </div>
-                    <div class="playlist-details">
-                        <h3 class="playlist-name">@playlist.Name</h3>
-                        @if (!string.IsNullOrEmpty(playlist.Description))
+                    <div class="playlist-actions">
+                        @if (_selectedPlaylist.ExternalUrls?.Spotify != null)
                         {
-                            <p class="playlist-description">
-                                @((MarkupString)CleanDescription(playlist.Description))
-                            </p>
-                        }
-                        <div class="playlist-meta">
-                            <span class="playlist-tracks">@playlist.Tracks?.Total tracks</span>
-                            @if (playlist.Followers != null && playlist.Followers.Total > 0)
-                            {
-                                <span class="playlist-followers">@playlist.Followers.Total followers</span>
-                            }
-                            @if (playlist.IsCollaborative)
-                            {
-                                <span class="playlist-collaborative">Collaborative</span>
-                            }
-                            @if (!playlist.IsPublic)
-                            {
-                                <span class="playlist-private">Private</span>
-                            }
-                        </div>
-                        @if (playlist.ExternalUrls?.Spotify != null)
-                        {
-                            <a href="@playlist.ExternalUrls.Spotify" target="_blank" class="open-spotify-btn">
+                            <a href="@_selectedPlaylist.ExternalUrls.Spotify" target="_blank" class="btn btn-outline-light">
                                 <i class="bi bi-spotify"></i> Open in Spotify
                             </a>
                         }
                     </div>
                 </div>
-            }
+            </div>
+            
+            <div class="playlist-tracks-container">
+                <h2>Tracks</h2>
+                
+                @if (_isLoadingTracks)
+                {
+                    <div class="loading-container">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading tracks...</span>
+                        </div>
+                        <p>Loading tracks...</p>
+                    </div>
+                }
+                else if (_playlistTracks == null || _playlistTracks.Count == 0)
+                {
+                    <p>This playlist has no tracks.</p>
+                }
+                else
+                {
+                    <div class="tracks-table-container">
+                        <table class="tracks-table">
+                            <thead>
+                                <tr>
+                                    <th class="track-number-column">#</th>
+                                    <th class="track-title-column">Title</th>
+                                    <th class="track-album-column">Album</th>
+                                    <th class="track-added-column">Date Added</th>
+                                    <th class="track-duration-column">
+                                        <i class="bi bi-clock"></i>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @{
+                                    var tracks = _playlistTracks;
+                                    if (tracks != null && tracks.Count > 0)
+                                    {
+                                        for (int i = 0; i < tracks.Count; i++)
+                                        {
+                                            var track = tracks[i];
+                                            <tr class="track-row">
+                                                <td class="track-number">@(i + 1)</td>
+                                                <td class="track-title">
+                                                    <div class="track-info">
+                                                        @if (track.Track?.Album?.Images != null && track.Track.Album.Images.Count > 0)
+                                                        {
+                                                            <img src="@track.Track.Album.Images[track.Track.Album.Images.Count - 1].Url" class="track-image" alt="@track.Track.Name" />
+                                                        }
+                                                        else
+                                                        {
+                                                            <div class="track-image-placeholder"></div>
+                                                        }
+                                                        <div class="track-name-artist">
+                                                            <div class="track-name">@track.Track?.Name</div>
+                                                            <div class="track-artist">
+                                                                @if (track.Track?.Artists != null)
+                                                                {
+                                                                    @string.Join(", ", track.Track.Artists.Select(a => a.Name))
+                                                                }
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td class="track-album">@track.Track?.Album?.Name</td>
+                                                <td class="track-added">
+                                                    @(track.AddedAt?.ToLocalTime().ToString("MMM d, yyyy") ?? "")
+                                                </td>
+                                                <td class="track-duration">@track.Track?.FormattedDuration</td>
+                                            </tr>
+                                        }
+                                    }
+                                    
+                                    if (_isLoadingTracks)
+                                    {
+                                        <tr class="track-row-placeholder">
+                                            <td colspan="5" class="track-placeholder">
+                                                <div class="placeholder-content">
+                                                    <div class="spinner-border spinner-border-sm text-light" role="status">
+                                                        <span class="visually-hidden">Loading...</span>
+                                                    </div>
+                                                    <span>Loading tracks...</span>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                    
+                                    @if (_hasMoreTracks && !_isLoadingTracks)
+                                    {
+                                        <tr>
+                                            <td colspan="5" style="text-align: center; padding: 1rem;">
+                                                <button class="btn btn-outline-light" @onclick="LoadMoreTracks">
+                                                    Load More Tracks
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    }
+                                }
+                            </tbody>
+                        </table>
+                        
+                    </div>
+                }
+            </div>
         </div>
+    }
+    else
+    {
+        <h1>My Playlists</h1>
+
+        @if (!_isAuthenticated)
+        {
+            <div class="alert alert-warning">
+                <p>Please <a href="/auth">log in with Spotify</a> to view your playlists.</p>
+            </div>
+        }
+        else if (_loading)
+        {
+            <div class="loading-container">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p>Loading your playlists...</p>
+            </div>
+        }
+        else if (_playlists == null || _playlists.Count == 0)
+        {
+            <div class="alert alert-info">
+                <p>You don't have any playlists yet.</p>
+            </div>
+        }
+        else
+        {
+            <div class="playlists-grid">
+                @foreach (var playlist in _playlists)
+                {
+                    <div class="playlist-card">
+                        <div class="playlist-image" @onclick="() => NavigateToPlaylistDetail(playlist.Id)">
+                            @if (playlist.Images != null && playlist.Images.Count > 0)
+                            {
+                                <img src="@playlist.Images[0].Url" alt="@playlist.Name" />
+                            }
+                            else
+                            {
+                                <div class="playlist-image-placeholder">
+                                    <i class="bi bi-music-note-list"></i>
+                                </div>
+                            }
+                        </div>
+                        <div class="playlist-details">
+                            <h3 class="playlist-name" @onclick="() => NavigateToPlaylistDetail(playlist.Id)">@playlist.Name</h3>
+                            @if (!string.IsNullOrEmpty(playlist.Description))
+                            {
+                                <p class="playlist-description">
+                                    @((MarkupString)CleanDescription(playlist.Description))
+                                </p>
+                            }
+                            <div class="playlist-meta">
+                                <span class="playlist-tracks">@playlist.Tracks?.Total tracks</span>
+                                @if (playlist.Followers != null && playlist.Followers.Total > 0)
+                                {
+                                    <span class="playlist-followers">@playlist.Followers.Total followers</span>
+                                }
+                                @if (playlist.IsCollaborative)
+                                {
+                                    <span class="playlist-collaborative">Collaborative</span>
+                                }
+                                @if (!playlist.IsPublic)
+                                {
+                                    <span class="playlist-private">Private</span>
+                                }
+                            </div>
+                            <div class="playlist-actions">
+                                @if (playlist.ExternalUrls?.Spotify != null)
+                                {
+                                    <a href="@playlist.ExternalUrls.Spotify" target="_blank" class="open-spotify-btn">
+                                        <i class="bi bi-spotify"></i> Open in Spotify
+                                    </a>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
     }
 </div>
 
+<style>
+    .playlists-container {
+        padding: 1.5rem;
+    }
+    
+    .playlists-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 20px;
+        margin-top: 1.5rem;
+    }
+    
+    .playlist-card {
+        background-color: #282828;
+        border-radius: 8px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        transition: background-color 0.2s;
+    }
+    
+    .playlist-card:hover {
+        background-color: #333333;
+    }
+    
+    .playlist-image {
+        position: relative;
+        aspect-ratio: 1 / 1;
+        overflow: hidden;
+        cursor: pointer;
+    }
+    
+    .playlist-image img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    
+    .playlist-image-placeholder {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #333;
+    }
+    
+    .playlist-image-placeholder i {
+        font-size: 48px;
+        color: #aaa;
+    }
+    
+    .playlist-image::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.3);
+        opacity: 0;
+        transition: opacity 0.2s;
+    }
+    
+    .playlist-image:hover::after {
+        opacity: 1;
+    }
+    
+    .playlist-details {
+        padding: 16px;
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .playlist-name {
+        font-size: 16px;
+        font-weight: 600;
+        margin: 0 0 8px 0;
+        cursor: pointer;
+    }
+    
+    .playlist-name:hover {
+        text-decoration: underline;
+    }
+    
+    .playlist-description {
+        font-size: 14px;
+        color: #b3b3b3;
+        margin-bottom: 12px;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    
+    .playlist-meta {
+        margin-bottom: 12px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    
+    .playlist-tracks, .playlist-followers, .playlist-collaborative, .playlist-private {
+        font-size: 12px;
+        color: #b3b3b3;
+        background-color: #333;
+        padding: 4px 8px;
+        border-radius: 12px;
+    }
+    
+    .playlist-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: auto;
+    }
+    
+    .open-spotify-btn {
+        color: #b3b3b3;
+        text-decoration: none;
+        font-size: 14px;
+        display: inline-flex;
+        align-items: center;
+        padding: 6px 12px;
+        background-color: transparent;
+        border: 1px solid #b3b3b3;
+        border-radius: 4px;
+        transition: all 0.2s;
+    }
+    
+    .open-spotify-btn i {
+        margin-right: 6px;
+    }
+    
+    .open-spotify-btn:hover {
+        color: white;
+        border-color: white;
+    }
+    
+    .loading-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin: 2rem 0;
+    }
+    
+    /* Playlist Detail View Styles */
+    .playlist-detail-view {
+        margin-bottom: 2rem;
+    }
+    
+    .back-link {
+        margin-bottom: 1rem;
+    }
+    
+    .playlist-detail-header {
+        display: flex;
+        gap: 24px;
+        margin-bottom: 2rem;
+    }
+    
+    .playlist-detail-image {
+        width: 300px;
+        height: 300px;
+        overflow: hidden;
+    }
+    
+    .playlist-detail-image img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    
+    .playlist-detail-info {
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .playlist-detail-info h1 {
+        margin-top: 0;
+        font-size: 2.5rem;
+        margin-bottom: 1rem;
+    }
+    
+    .playlist-tracks-container {
+        background-color: #282828;
+        border-radius: 8px;
+        padding: 1.5rem;
+    }
+    
+    .playlist-tracks-container h2 {
+        margin-top: 0;
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+    }
+    
+    /* Tracks table styles */
+    .tracks-table-container {
+        overflow-x: auto;
+        overflow-y: auto;
+        max-height: 600px;
+    }
+    
+    .tracks-table {
+        width: 100%;
+        border-collapse: collapse;
+        color: #b3b3b3;
+    }
+    
+    .tracks-table thead {
+        border-bottom: 1px solid #333;
+    }
+    
+    .tracks-table th {
+        text-align: left;
+        padding: 0.5rem;
+        font-size: 0.8rem;
+        font-weight: 500;
+        color: #999;
+    }
+    
+    .tracks-table td {
+        padding: 0.5rem;
+        border-top: 1px solid #333;
+    }
+    
+    .track-row {
+        transition: background-color 0.2s;
+    }
+    
+    .track-row:hover {
+        background-color: #333;
+    }
+    
+    .track-number {
+        color: #999;
+        width: 40px;
+        text-align: right;
+    }
+    
+    .track-info {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .track-image {
+        width: 40px;
+        height: 40px;
+        object-fit: cover;
+    }
+    
+    .track-image-placeholder {
+        width: 40px;
+        height: 40px;
+        background-color: #333;
+    }
+    
+    .track-name-artist {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .track-name {
+        color: #fff;
+        font-weight: 500;
+    }
+    
+    .track-artist {
+        font-size: 0.8rem;
+        color: #999;
+    }
+    
+    .track-album {
+        color: #999;
+        max-width: 200px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    .track-added {
+        color: #999;
+        font-size: 0.8rem;
+    }
+    
+    .track-duration {
+        color: #999;
+        text-align: right;
+    }
+    
+    .track-number-column {
+        width: 40px;
+    }
+    
+    .track-duration-column {
+        width: 60px;
+        text-align: right;
+    }
+    
+    .track-title-column {
+        min-width: 300px;
+    }
+    
+    .track-album-column {
+        min-width: 180px;
+    }
+    
+    .track-added-column {
+        width: 140px;
+    }
+    
+    .loading-more-indicator {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        color: #b3b3b3;
+        gap: 0.5rem;
+    }
+    
+    .track-row-placeholder {
+        background-color: #333;
+    }
+    
+    .placeholder-content {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        color: #b3b3b3;
+        padding: 1rem;
+    }
+    
+    @@media (max-width: 768px) {
+        .playlist-detail-header {
+            flex-direction: column;
+        }
+        
+        .playlist-detail-image {
+            width: 100%;
+            max-width: 300px;
+            margin: 0 auto;
+        }
+        
+        .track-album-column,
+        .track-album {
+            display: none;
+        }
+        
+        .track-added-column,
+        .track-added {
+            display: none;
+        }
+    }
+</style>
+
 @code {
+    [Parameter]
+    public string? PlaylistId { get; set; }
+    
     private bool _isAuthenticated;
     private bool _loading = true;
+    private bool _isLoadingTracks = false;
     private List<SpotifyPlaylist>? _playlists;
+    private List<PlaylistTrack>? _playlistTracks = new List<PlaylistTrack>();
+    private SpotifyPlaylist? _selectedPlaylist;
+    private int _tracksOffset = 0;
+    private bool _hasMoreTracks = true;
+    private const int _tracksPageSize = 20; // Smaller batch size to make infinite scrolling more noticeable
+    private bool _isPlaylistDetailView => !string.IsNullOrEmpty(PlaylistId);
+    private bool _isLikedSongsView => PlaylistId == "liked";
 
     protected override async Task OnInitializedAsync()
     {
@@ -99,19 +637,121 @@
         if (_isAuthenticated)
         {
             await LoadPlaylistsAsync();
+            
+            if (_isPlaylistDetailView && _playlists != null)
+            {
+                _selectedPlaylist = _playlists.FirstOrDefault(p => p.Id == PlaylistId);
+            }
         }
         else
         {
             _loading = false;
         }
     }
+    
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_isAuthenticated && _isPlaylistDetailView && _playlists != null)
+        {
+            _selectedPlaylist = _playlists.FirstOrDefault(p => p.Id == PlaylistId);
+            await JSRuntime.InvokeVoidAsync("console.log", $"Selected playlist: {_selectedPlaylist?.Name ?? "null"} with ID {_selectedPlaylist?.Id ?? "null"}");
+            
+            if (_selectedPlaylist != null)
+            {
+                // Reset tracks and load the first batch
+                _playlistTracks = new List<PlaylistTrack>();
+                _tracksOffset = 0;
+                _hasMoreTracks = true;
+                await LoadMoreTracks();
+            }
+        }
+    }
+    
+    
+    private async Task LoadMoreTracks()
+    {
+        if (_selectedPlaylist == null || !_hasMoreTracks || _isLoadingTracks)
+        {
+            await JSRuntime.InvokeVoidAsync("console.log", "Cannot load more tracks");
+            return;
+        }
+        
+        try
+        {
+            _isLoadingTracks = true;
+            StateHasChanged();
+            
+            List<PlaylistTrack>? newTracks = null;
+            
+            await JSRuntime.InvokeVoidAsync("console.log", $"Loading more tracks: offset={_tracksOffset}, pageSize={_tracksPageSize}");
+            
+            if (_isLikedSongsView)
+            {
+                newTracks = await AuthService.GetLikedTracksAsync(_tracksPageSize, _tracksOffset);
+                await JSRuntime.InvokeVoidAsync("console.log", $"Retrieved {newTracks?.Count ?? 0} liked tracks");
+            }
+            else if (!string.IsNullOrEmpty(_selectedPlaylist.Id))
+            {
+                newTracks = await AuthService.GetPlaylistTracksAsync(_selectedPlaylist.Id, _tracksPageSize, _tracksOffset);
+                await JSRuntime.InvokeVoidAsync("console.log", $"Retrieved {newTracks?.Count ?? 0} playlist tracks");
+            }
+            
+            if (newTracks != null && newTracks.Count > 0)
+            {
+                if (_playlistTracks == null)
+                {
+                    _playlistTracks = new List<PlaylistTrack>();
+                }
+                
+                _playlistTracks.AddRange(newTracks);
+                _tracksOffset += newTracks.Count;
+                
+                await JSRuntime.InvokeVoidAsync("console.log", $"Total tracks: {_playlistTracks.Count}");
+                
+                // Check if we've reached the end
+                if (_selectedPlaylist.Tracks != null)
+                {
+                    bool endReached = newTracks.Count < _tracksPageSize || 
+                                     _tracksOffset >= _selectedPlaylist.Tracks.Total;
+                    
+                    if (endReached)
+                    {
+                        _hasMoreTracks = false;
+                        await JSRuntime.InvokeVoidAsync("console.log", "Reached the end of tracks");
+                    }
+                }
+            }
+            else
+            {
+                _hasMoreTracks = false;
+                await JSRuntime.InvokeVoidAsync("console.log", "No more tracks available");
+            }
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("console.error", $"Error loading more tracks: {ex.Message}");
+        }
+        finally
+        {
+            _isLoadingTracks = false;
+            StateHasChanged();
+        }
+    }
+    
+    // Disposal implementation for cleaning up resources
+    public void Dispose()
+    {
+        // This method is needed for the IDisposable interface, but we
+        // don't need it anymore since virtualization is handled by Blazor
+    }
+    
 
     private async Task LoadPlaylistsAsync()
     {
         try
         {
             _loading = true;
-            _playlists = await AuthService.GetPlaylistsAsync(50, 0);
+            _playlists = await AuthService.GetPlaylistsWithLikedSongs(50, 0);
         }
         catch (Exception ex)
         {
@@ -147,4 +787,13 @@
         
         return safeDescription;
     }
+    
+    private void NavigateToPlaylistDetail(string? playlistId)
+    {
+        if (!string.IsNullOrEmpty(playlistId))
+        {
+            NavigationManager.NavigateTo($"/playlists/{playlistId}");
+        }
+    }
+    
 }

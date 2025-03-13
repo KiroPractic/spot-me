@@ -24,8 +24,8 @@ builder.Services.AddControllers()
     });
 
 // Register Spotify services
-builder.Services.AddScoped<SpotifyAuthService>(sp => 
-    new SpotifyAuthService(
+builder.Services.AddScoped<SpotifyService>(sp => 
+    new SpotifyService(
         sp.GetRequiredService<IJSRuntime>(),
         sp.GetRequiredService<IHttpClientFactory>().CreateClient()
     )
