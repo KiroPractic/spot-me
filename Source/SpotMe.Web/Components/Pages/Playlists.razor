@@ -131,83 +131,66 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                @{
-                                    var tracks = _playlistTracks;
-                                    if (tracks != null && tracks.Count > 0)
-                                    {
-                                        for (int i = 0; i < tracks.Count; i++)
+                                <InfiniteScrolling TItem="(PlaylistTrack, int)" ItemsProvider="GetPlaylistTracksAsync" @ref="_infiniteScrollComponent">
+                                    <ItemTemplate Context="trackData">
+                                        @{
+                                            var track = trackData.Item1;
+                                            var index = trackData.Item2;
+                                        }
+                                        <tr class="track-row">
+                                            <td class="track-number">@index</td>
+                                            <td class="track-title">
+                                                <div class="track-info">
+                                                    @if (track.Track?.Album?.Images != null && track.Track.Album.Images.Count > 0)
+                                                    {
+                                                        <img src="@track.Track.Album.Images[track.Track.Album.Images.Count - 1].Url" class="track-image" alt="@track.Track.Name" />
+                                                    }
+                                                    else
+                                                    {
+                                                        <div class="track-image-placeholder"></div>
+                                                    }
+                                                    <div class="track-name-artist">
+                                                        <div class="track-name">@track.Track?.Name</div>
+                                                        <div class="track-artist">
+                                                            @if (track.Track?.Artists != null)
+                                                            {
+                                                                @string.Join(", ", track.Track.Artists.Select(a => a.Name))
+                                                            }
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td class="track-album">@track.Track?.Album?.Name</td>
+                                            <td class="track-added">
+                                                @(track.AddedAt?.ToLocalTime().ToString("MMM d, yyyy") ?? "")
+                                            </td>
+                                            <td class="track-duration">@track.Track?.FormattedDuration</td>
+                                        </tr>
+                                    </ItemTemplate>
+                                    <LoadingTemplate>
+                                        @for (int i = 0; i < 5; i++)
                                         {
-                                            var track = tracks[i];
-                                            <tr class="track-row">
-                                                <td class="track-number">@(i + 1)</td>
+                                            <tr class="track-row skeleton-row">
+                                                <td class="track-number"><div class="skeleton skeleton-text"></div></td>
                                                 <td class="track-title">
                                                     <div class="track-info">
-                                                        @if (track.Track?.Album?.Images != null && track.Track.Album.Images.Count > 0)
-                                                        {
-                                                            <img src="@track.Track.Album.Images[track.Track.Album.Images.Count - 1].Url" class="track-image" alt="@track.Track.Name" />
-                                                        }
-                                                        else
-                                                        {
-                                                            <div class="track-image-placeholder"></div>
-                                                        }
+                                                        <div class="skeleton skeleton-image"></div>
                                                         <div class="track-name-artist">
-                                                            <div class="track-name">@track.Track?.Name</div>
-                                                            <div class="track-artist">
-                                                                @if (track.Track?.Artists != null)
-                                                                {
-                                                                    @string.Join(", ", track.Track.Artists.Select(a => a.Name))
-                                                                }
-                                                            </div>
+                                                            <div class="skeleton skeleton-title"></div>
+                                                            <div class="skeleton skeleton-artist"></div>
                                                         </div>
                                                     </div>
                                                 </td>
-                                                <td class="track-album">@track.Track?.Album?.Name</td>
-                                                <td class="track-added">
-                                                    @(track.AddedAt?.ToLocalTime().ToString("MMM d, yyyy") ?? "")
-                                                </td>
-                                                <td class="track-duration">@track.Track?.FormattedDuration</td>
+                                                <td class="track-album"><div class="skeleton skeleton-album"></div></td>
+                                                <td class="track-added"><div class="skeleton skeleton-date"></div></td>
+                                                <td class="track-duration"><div class="skeleton skeleton-duration"></div></td>
                                             </tr>
                                         }
-                                    }
-                                }
+                                    </LoadingTemplate>
+                                </InfiniteScrolling>
                             </tbody>
                         </table>
                     </div>
-                    
-                    @if (_isLoadingTracks)
-                    {
-                        <table class="tracks-table skeleton-table">
-                            <tbody>
-                                @for (int i = 0; i < 7; i++)
-                                {
-                                    <tr class="track-row skeleton-row">
-                                        <td class="track-number"><div class="skeleton skeleton-text"></div></td>
-                                        <td class="track-title">
-                                            <div class="track-info">
-                                                <div class="skeleton skeleton-image"></div>
-                                                <div class="track-name-artist">
-                                                    <div class="skeleton skeleton-title"></div>
-                                                    <div class="skeleton skeleton-artist"></div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td class="track-album"><div class="skeleton skeleton-album"></div></td>
-                                        <td class="track-added"><div class="skeleton skeleton-date"></div></td>
-                                        <td class="track-duration"><div class="skeleton skeleton-duration"></div></td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
-                    }
-                    
-                    @if (_hasMoreTracks && !_isLoadingTracks)
-                    {
-                        <div class="load-more-container text-center p-3">
-                            <button class="btn btn-outline-light" @onclick="LoadMoreTracks">
-                                Load More Tracks
-                            </button>
-                        </div>
-                    }
                 }
             </div>
         </div>
@@ -771,15 +754,13 @@
     
     private bool _isAuthenticated;
     private bool _loading = true;
-    private bool _isLoadingTracks = false;
     private List<SpotifyPlaylist>? _playlists;
     private List<PlaylistTrack>? _playlistTracks = new List<PlaylistTrack>();
     private SpotifyPlaylist? _selectedPlaylist;
-    private int _tracksOffset = 0;
-    private bool _hasMoreTracks = true;
     private const int _tracksPageSize = 20; // Smaller batch size to make infinite scrolling more noticeable
     private bool _isPlaylistDetailView => !string.IsNullOrEmpty(PlaylistId);
     private bool _isLikedSongsView => PlaylistId == "liked";
+    private InfiniteScrolling<(PlaylistTrack, int)>? _infiniteScrollComponent;
 
     protected override async Task OnInitializedAsync()
     {
@@ -807,131 +788,84 @@
         if (_isAuthenticated && _isPlaylistDetailView && _playlists != null)
         {
             _selectedPlaylist = _playlists.FirstOrDefault(p => p.Id == PlaylistId);
-            await JSRuntime.InvokeVoidAsync("console.log", $"Selected playlist: {_selectedPlaylist?.Name ?? "null"} with ID {_selectedPlaylist?.Id ?? "null"}");
             
             if (_selectedPlaylist != null)
             {
-                // Reset tracks and load the first batch
+                // Reset tracks collection for the new playlist
                 _playlistTracks = new List<PlaylistTrack>();
-                _tracksOffset = 0;
-                _hasMoreTracks = true;
-                await LoadMoreTracks();
                 
-                // Create a DotNet reference for JavaScript to call back to our component
-                _dotNetRef = DotNetObjectReference.Create(this);
-                
-                // Add scroll event listener to auto-load more tracks
-                await JSRuntime.InvokeVoidAsync("setupAutoLoadTracks", _dotNetRef);
+                // If we have the infinite scroll component, refresh it to load the new playlist
+                if (_infiniteScrollComponent != null)
+                {
+                    await _infiniteScrollComponent.RefreshDataAsync();
+                }
             }
         }
     }
     
-    private async Task LoadMoreTracks()
+    // This method will be called by the InfiniteScrolling component to get tracks
+    private async Task<IEnumerable<(PlaylistTrack, int)>> GetPlaylistTracksAsync(InfiniteScrollingItemsProviderRequest request)
     {
-        if (_selectedPlaylist == null || !_hasMoreTracks || _isLoadingTracks)
+        // Check if we have a selected playlist
+        if (_selectedPlaylist == null)
         {
-            Console.WriteLine("Cannot load more tracks");
-            return;
+            return Array.Empty<(PlaylistTrack, int)>();
         }
         
         try
         {
-            // Save the current scroll position before loading more tracks
-            double scrollPosition = await JSRuntime.InvokeAsync<double>("getScrollPosition");
-            
-            _isLoadingTracks = true;
-            StateHasChanged();
-            
             List<PlaylistTrack>? newTracks = null;
             
-            // Add artificial delay to simulate slower loading
-            await Task.Delay(1500);
+            // Add a small delay to simulate network latency and show loading state
+            await Task.Delay(500);
             
             if (_isLikedSongsView)
             {
-                newTracks = await AuthService.GetLikedTracksAsync(_tracksPageSize, _tracksOffset);
-                Console.WriteLine($"Retrieved {newTracks?.Count ?? 0} liked tracks");
+                newTracks = await AuthService.GetLikedTracksAsync(_tracksPageSize, request.StartIndex);
             }
             else if (!string.IsNullOrEmpty(_selectedPlaylist.Id))
             {
-                newTracks = await AuthService.GetPlaylistTracksAsync(_selectedPlaylist.Id, _tracksPageSize, _tracksOffset);
-                Console.WriteLine($"Retrieved {newTracks?.Count ?? 0} playlist tracks");
+                newTracks = await AuthService.GetPlaylistTracksAsync(_selectedPlaylist.Id, _tracksPageSize, request.StartIndex);
             }
             
+            // If we got tracks back, return them with their indices
             if (newTracks != null && newTracks.Count > 0)
             {
+                // Store in the component's list for backup/reference
                 if (_playlistTracks == null)
                 {
                     _playlistTracks = new List<PlaylistTrack>();
                 }
                 
+                // Add to our internal track list for backup
                 _playlistTracks.AddRange(newTracks);
-                _tracksOffset += newTracks.Count;
                 
-                Console.WriteLine($"Total tracks: {_playlistTracks.Count}");
-                
-                // Check if we've reached the end
-                if (_selectedPlaylist.Tracks != null)
-                {
-                    bool endReached = newTracks.Count < _tracksPageSize || 
-                                     _tracksOffset >= _selectedPlaylist.Tracks.Total;
-                    
-                    if (endReached)
-                    {
-                        _hasMoreTracks = false;
-                        Console.WriteLine("Reached the end of tracks");
-                    }
-                }
+                // Return the new tracks with their proper indices - starting from where we requested
+                return newTracks.Select((track, i) => (track, request.StartIndex + i + 1));
             }
-            else
-            {
-                _hasMoreTracks = false;
-                Console.WriteLine("No more tracks available");
-            }
-            
-            // Update the UI
-            _isLoadingTracks = false;
-            StateHasChanged();
-            
-            // Allow the UI to update before restoring scroll position
-            await Task.Delay(50);
-            
-            // Restore the scroll position after the UI has updated
-            await JSRuntime.InvokeVoidAsync("restoreScrollPosition", scrollPosition);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error loading more tracks: {ex.Message}");
-            _isLoadingTracks = false;
-            StateHasChanged();
+            await JSRuntime.InvokeVoidAsync("console.error", $"Error fetching tracks: {ex.Message}");
         }
+        
+        // If we got here, we have no tracks to return
+        return Array.Empty<(PlaylistTrack, int)>();
     }
     
-    private DotNetObjectReference<Playlists>? _dotNetRef;
-    
-    [JSInvokable]
-    public async Task OnScrollNearBottom()
-    {
-        // Only load more if we're not already loading and have more tracks to load
-        if (!_isLoadingTracks && _hasMoreTracks)
-        {
-            await LoadMoreTracks();
-        }
-    }
-    
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
         try
         {
-            // Remove the scroll event listener
-            JSRuntime.InvokeVoidAsync("cleanupAutoLoadTracks");
-            
-            // Dispose the .NET reference
-            _dotNetRef?.Dispose();
+            // Dispose the infinite scrolling component if it exists
+            if (_infiniteScrollComponent != null)
+            {
+                await _infiniteScrollComponent.DisposeAsync();
+            }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error in Dispose: {ex.Message}");
+            Console.WriteLine($"Error in DisposeAsync: {ex.Message}");
         }
     }
 
