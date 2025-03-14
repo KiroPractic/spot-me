@@ -1,0 +1,161 @@
+@page "/playlists"
+@namespace SpotMe.Web.Components.Pages.Playlists
+@using SpotMe.Web.Services
+@rendermode InteractiveServer
+@inject SpotifyService AuthService
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+
+<PageTitle>My Playlists - SpotMe</PageTitle>
+
+<div class="container playlists-container">
+    <h1>My Playlists</h1>
+
+    @if (!_isAuthenticated)
+    {
+        <div class="alert alert-warning">
+            <p>Please <a href="/auth">log in with Spotify</a> to view your playlists.</p>
+        </div>
+    }
+    else if (_loading)
+    {
+        <div class="loading-container">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p>Loading your playlists...</p>
+        </div>
+    }
+    else if (_playlists == null || _playlists.Count == 0)
+    {
+        <div class="alert alert-info">
+            <p>You don't have any playlists yet.</p>
+        </div>
+    }
+    else
+    {
+        <div class="playlists-grid">
+            @foreach (var playlist in _playlists)
+            {
+                <div class="playlist-card">
+                    <div class="playlist-image" @onclick="() => NavigateToPlaylistDetail(playlist.Id)">
+                        @if (playlist.Images != null && playlist.Images.Count > 0)
+                        {
+                            <img src="@playlist.Images[0].Url" alt="@playlist.Name" />
+                        }
+                        else
+                        {
+                            <div class="playlist-image-placeholder">
+                                <i class="bi bi-music-note-list"></i>
+                            </div>
+                        }
+                    </div>
+                    <div class="playlist-details">
+                        <h3 class="playlist-name" @onclick="() => NavigateToPlaylistDetail(playlist.Id)">@playlist.Name</h3>
+                        @if (!string.IsNullOrEmpty(playlist.Description))
+                        {
+                            <p class="playlist-description">
+                                @((MarkupString)CleanDescription(playlist.Description))
+                            </p>
+                        }
+                        <div class="playlist-meta">
+                            <span class="playlist-tracks">@(playlist.Tracks?.Total) tracks</span>
+                            @if (playlist.Followers != null && playlist.Followers.Total > 0)
+                            {
+                                <span class="playlist-followers">@playlist.Followers.Total followers</span>
+                            }
+                            @if (playlist.IsCollaborative)
+                            {
+                                <span class="playlist-collaborative">Collaborative</span>
+                            }
+                            @if (!playlist.IsPublic)
+                            {
+                                <span class="playlist-private">Private</span>
+                            }
+                        </div>
+                        <div class="playlist-actions">
+                            @if (playlist.ExternalUrls?.Spotify != null)
+                            {
+                                <a href="@playlist.ExternalUrls.Spotify" target="_blank" class="open-spotify-btn">
+                                    <i class="bi bi-spotify"></i> Open in Spotify
+                                </a>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private bool _isAuthenticated;
+    private bool _loading = true;
+    private List<SpotifyPlaylist>? _playlists;
+    
+    protected override async Task OnInitializedAsync()
+    {
+        // Check if user is authenticated
+        var token = await AuthService.GetAccessTokenAsync();
+        _isAuthenticated = !string.IsNullOrEmpty(token);
+
+        if (_isAuthenticated)
+        {
+            await LoadPlaylistsAsync();
+        }
+        else
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task LoadPlaylistsAsync()
+    {
+        try
+        {
+            _loading = true;
+            _playlists = await AuthService.GetPlaylistsWithLikedSongs(50, 0);
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("console.error", $"Error loading playlists: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+    
+    private string CleanDescription(string description)
+    {
+        if (string.IsNullOrEmpty(description))
+        {
+            return string.Empty;
+        }
+        
+        // Remove potentially unsafe tags but allow safe formatting
+        string safeDescription = System.Text.RegularExpressions.Regex.Replace(
+            description, 
+            @"<(?!/?(?:b|i|p|br\s?/?)(?:\s[^>]*)?>)[^>]*>", 
+            string.Empty
+        );
+        
+        // Convert any URLs to actual links
+        safeDescription = System.Text.RegularExpressions.Regex.Replace(
+            safeDescription,
+            @"(https?://[^\s<]+)",
+            "<a href=\"$1\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"playlist-link\">$1</a>"
+        );
+        
+        return safeDescription;
+    }
+    
+    private void NavigateToPlaylistDetail(string? playlistId)
+    {
+        if (!string.IsNullOrEmpty(playlistId))
+        {
+            NavigationManager.NavigateTo($"/playlists/{playlistId}");
+        }
+    }
+}

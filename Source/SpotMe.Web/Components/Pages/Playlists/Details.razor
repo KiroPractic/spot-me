@@ -1,0 +1,407 @@
+@page "/playlists/{PlaylistId}"
+@namespace SpotMe.Web.Components.Pages.Playlists
+@using SpotMe.Web.Services
+@using System.Threading
+@using Microsoft.AspNetCore.Components.Web.Virtualization
+@using SpotMe.Web.Components.Pages
+@using SpotMe.Web.Components.Shared
+@rendermode InteractiveServer
+@inject SpotifyService AuthService
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+@implements IAsyncDisposable
+
+<PageTitle>Playlist Details - SpotMe</PageTitle>
+
+<div class="container playlists-container">
+    <div class="playlist-detail-view">
+        <div class="back-link">
+            <a href="/playlists" class="btn btn-outline-light btn-sm">
+                <i class="bi bi-arrow-left"></i> Back to Playlists
+            </a>
+        </div>
+        
+        @if (_loading)
+        {
+            <div class="loading-container">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p>Loading playlist...</p>
+            </div>
+        }
+        else if (_selectedPlaylist != null)
+        {
+            <div class="playlist-detail-header">
+                <div class="playlist-detail-image">
+                    @if (_selectedPlaylist.Images != null && _selectedPlaylist.Images.Count > 0)
+                    {
+                        <img src="@_selectedPlaylist.Images[0].Url" alt="@_selectedPlaylist.Name" />
+                    }
+                    else
+                    {
+                        <div class="playlist-image-placeholder">
+                            <i class="bi bi-music-note-list"></i>
+                        </div>
+                    }
+                </div>
+                <div class="playlist-detail-info">
+                    <h1>@_selectedPlaylist.Name</h1>
+                    @if (!string.IsNullOrEmpty(_selectedPlaylist.Description))
+                    {
+                        <p class="playlist-description">
+                            @((MarkupString)CleanDescription(_selectedPlaylist.Description))
+                        </p>
+                    }
+                    <div class="playlist-meta">
+                        <span class="playlist-tracks">@(_selectedPlaylist.Tracks?.Total) tracks</span>
+                        @if (_selectedPlaylist.Followers != null && _selectedPlaylist.Followers.Total > 0)
+                        {
+                            <span class="playlist-followers">@_selectedPlaylist.Followers.Total followers</span>
+                        }
+                        @if (_selectedPlaylist.IsCollaborative)
+                        {
+                            <span class="playlist-collaborative">Collaborative</span>
+                        }
+                        @if (!_selectedPlaylist.IsPublic)
+                        {
+                            <span class="playlist-private">Private</span>
+                        }
+                    </div>
+                    <div class="playlist-actions">
+                        @if (_selectedPlaylist.ExternalUrls?.Spotify != null)
+                        {
+                            <a href="@_selectedPlaylist.ExternalUrls.Spotify" target="_blank" class="btn btn-outline-light">
+                                <i class="bi bi-spotify"></i> Open in Spotify
+                            </a>
+                        }
+                    </div>
+                </div>
+            </div>
+            
+            <div class="playlist-tracks-container">
+                <h2>Tracks</h2>
+                
+                @if (_isLoadingTracks && _playlistTracks?.Count == 0)
+                {
+                    <div class="tracks-table-container">
+                        <table class="tracks-table">
+                            <thead>
+                                <tr>
+                                    <th class="track-number-column">#</th>
+                                    <th class="track-title-column">Title</th>
+                                    <th class="track-album-column">Album</th>
+                                    <th class="track-added-column">Date Added</th>
+                                    <th class="track-duration-column">
+                                        <i class="bi bi-clock"></i>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @for (int i = 0; i < 7; i++)
+                                {
+                                    <tr class="track-row skeleton-row">
+                                        <td class="track-number"><div class="skeleton skeleton-text"></div></td>
+                                        <td class="track-title">
+                                            <div class="track-info">
+                                                <div class="skeleton skeleton-image"></div>
+                                                <div class="track-name-artist">
+                                                    <div class="skeleton skeleton-title"></div>
+                                                    <div class="skeleton skeleton-artist"></div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="track-album"><div class="skeleton skeleton-album"></div></td>
+                                        <td class="track-added"><div class="skeleton skeleton-date"></div></td>
+                                        <td class="track-duration"><div class="skeleton skeleton-duration"></div></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else if (_playlistTracks == null || _playlistTracks.Count == 0)
+                {
+                    <p>This playlist has no tracks.</p>
+                }
+                else
+                {
+                    <div class="tracks-table-container">
+                        <table class="tracks-table">
+                            <thead>
+                                <tr>
+                                    <th class="track-number-column">#</th>
+                                    <th class="track-title-column">Title</th>
+                                    <th class="track-album-column">Album</th>
+                                    <th class="track-added-column">Date Added</th>
+                                    <th class="track-duration-column">
+                                        <i class="bi bi-clock"></i>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <InfiniteScrolling TItem="(PlaylistTrack, int)" ItemsProvider="GetPlaylistTracksAsync" @ref="_infiniteScrollComponent">
+                                    <ItemTemplate Context="trackData">
+                                        @{
+                                            var track = trackData.Item1;
+                                            var index = trackData.Item2;
+                                        }
+                                        <tr class="track-row">
+                                            <td class="track-number">@index</td>
+                                            <td class="track-title">
+                                                <div class="track-info">
+                                                    @if (track.Track?.Album?.Images != null && track.Track.Album.Images.Count > 0)
+                                                    {
+                                                        <img src="@track.Track.Album.Images[track.Track.Album.Images.Count - 1].Url" class="track-image" alt="@track.Track.Name" />
+                                                    }
+                                                    else
+                                                    {
+                                                        <div class="track-image-placeholder"></div>
+                                                    }
+                                                    <div class="track-name-artist">
+                                                        <div class="track-name">@track.Track?.Name</div>
+                                                        <div class="track-artist">
+                                                            @if (track.Track?.Artists != null)
+                                                            {
+                                                                @string.Join(", ", track.Track.Artists.Select(a => a.Name))
+                                                            }
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td class="track-album">@track.Track?.Album?.Name</td>
+                                            <td class="track-added">
+                                                @(track.AddedAt?.ToLocalTime().ToString("MMM d, yyyy") ?? "")
+                                            </td>
+                                            <td class="track-duration">@track.Track?.FormattedDuration</td>
+                                        </tr>
+                                    </ItemTemplate>
+                                    <LoadingTemplate>
+                                        @if (_playlistTracks.Count == 0) 
+                                        {
+                                            @* Show 7 skeletons for initial load only (when no tracks yet) *@
+                                            @for (int i = 0; i < 7; i++)
+                                            {
+                                                <tr class="track-row skeleton-row">
+                                                    <td class="track-number"><div class="skeleton skeleton-text"></div></td>
+                                                    <td class="track-title">
+                                                        <div class="track-info">
+                                                            <div class="skeleton skeleton-image"></div>
+                                                            <div class="track-name-artist">
+                                                                <div class="skeleton skeleton-title"></div>
+                                                                <div class="skeleton skeleton-artist"></div>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td class="track-album"><div class="skeleton skeleton-album"></div></td>
+                                                    <td class="track-added"><div class="skeleton skeleton-date"></div></td>
+                                                    <td class="track-duration"><div class="skeleton skeleton-duration"></div></td>
+                                                </tr>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            @* Show minimalist Spotify-style dots for all subsequent loads *@
+                                            <tr>
+                                                <td colspan="5">
+                                                    <div class="spotify-loader">
+                                                        <span></span>
+                                                        <span></span>
+                                                        <span></span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </LoadingTemplate>
+                                </InfiniteScrolling>
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="alert alert-warning">
+                <p>Playlist not found.</p>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string? PlaylistId { get; set; }
+    
+    private bool _isAuthenticated;
+    private bool _loading = true;
+    private bool _isLoadingTracks = false;
+    private SpotifyPlaylist? _selectedPlaylist;
+    private List<PlaylistTrack>? _playlistTracks = new List<PlaylistTrack>();
+    private const int _tracksPageSize = 20; // Smaller batch size to make infinite scrolling more noticeable
+    private bool _isLikedSongsView => PlaylistId == "liked";
+    private InfiniteScrolling<(PlaylistTrack, int)>? _infiniteScrollComponent;
+    
+    protected override async Task OnInitializedAsync()
+    {
+        // Check if user is authenticated
+        var token = await AuthService.GetAccessTokenAsync();
+        _isAuthenticated = !string.IsNullOrEmpty(token);
+        
+        if (_isAuthenticated && !string.IsNullOrEmpty(PlaylistId))
+        {
+            await LoadPlaylistAsync();
+        }
+        else
+        {
+            _loading = false;
+        }
+    }
+    
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_isAuthenticated && !string.IsNullOrEmpty(PlaylistId))
+        {
+            // If the playlist ID changed, load the new playlist
+            if (_selectedPlaylist == null || PlaylistId != _selectedPlaylist.Id)
+            {
+                await LoadPlaylistAsync();
+            }
+        }
+    }
+    
+    private async Task LoadPlaylistAsync()
+    {
+        try
+        {
+            _loading = true;
+            _playlistTracks?.Clear();
+            
+            if (_isLikedSongsView)
+            {
+                // Create a virtual playlist for Liked Songs
+                _selectedPlaylist = new SpotifyPlaylist
+                {
+                    Id = "liked",
+                    Name = "Liked Songs",
+                    Description = "Songs you've liked on Spotify",
+                    Images = new List<SpotifyImage>
+                    {
+                        new SpotifyImage { Url = "/images/liked-songs.png" }
+                    },
+                    Tracks = new SpotifyTracks { Total = await AuthService.GetLikedTracksCountAsync() }
+                };
+            }
+            else
+            {
+                _selectedPlaylist = await AuthService.GetPlaylistAsync(PlaylistId);
+            }
+            
+            // If we have the infinite scroll component, refresh it to load the new playlist
+            if (_infiniteScrollComponent != null)
+            {
+                await _infiniteScrollComponent.RefreshDataAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("console.error", $"Error loading playlist: {ex.Message}");
+            _selectedPlaylist = null;
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+    
+    // This method will be called by the InfiniteScrolling component to get tracks
+    private async Task<IEnumerable<(PlaylistTrack, int)>> GetPlaylistTracksAsync(InfiniteScrollingItemsProviderRequest request)
+    {
+        // Check if we have a selected playlist
+        if (_selectedPlaylist == null)
+        {
+            return Array.Empty<(PlaylistTrack, int)>();
+        }
+        
+        try
+        {
+            List<PlaylistTrack>? newTracks = null;
+            
+            // Add a small delay to simulate network latency and show loading state
+            await Task.Delay(500);
+            
+            if (_isLikedSongsView)
+            {
+                newTracks = await AuthService.GetLikedTracksAsync(_tracksPageSize, request.StartIndex);
+            }
+            else if (!string.IsNullOrEmpty(_selectedPlaylist.Id))
+            {
+                newTracks = await AuthService.GetPlaylistTracksAsync(_selectedPlaylist.Id, _tracksPageSize, request.StartIndex);
+            }
+            
+            // If we got tracks back, return them with their indices
+            if (newTracks != null && newTracks.Count > 0)
+            {
+                // Store in the component's list for backup/reference
+                if (_playlistTracks == null)
+                {
+                    _playlistTracks = new List<PlaylistTrack>();
+                }
+                
+                // Add to our internal track list for backup
+                _playlistTracks.AddRange(newTracks);
+                
+                // Return the new tracks with their proper indices - starting from where we requested
+                return newTracks.Select((track, i) => (track, request.StartIndex + i + 1));
+            }
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("console.error", $"Error fetching tracks: {ex.Message}");
+        }
+        
+        // If we got here, we have no tracks to return
+        return Array.Empty<(PlaylistTrack, int)>();
+    }
+    
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            // Dispose the infinite scrolling component if it exists
+            if (_infiniteScrollComponent != null)
+            {
+                await _infiniteScrollComponent.DisposeAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error in DisposeAsync: {ex.Message}");
+        }
+    }
+    
+    private string CleanDescription(string description)
+    {
+        if (string.IsNullOrEmpty(description))
+        {
+            return string.Empty;
+        }
+        
+        // Remove potentially unsafe tags but allow safe formatting
+        string safeDescription = System.Text.RegularExpressions.Regex.Replace(
+            description, 
+            @"<(?!/?(?:b|i|p|br\s?/?)(?:\s[^>]*)?>)[^>]*>", 
+            string.Empty
+        );
+        
+        // Convert any URLs to actual links
+        safeDescription = System.Text.RegularExpressions.Regex.Replace(
+            safeDescription,
+            @"(https?://[^\s<]+)",
+            "<a href=\"$1\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"playlist-link\">$1</a>"
+        );
+        
+        return safeDescription;
+    }
+}
