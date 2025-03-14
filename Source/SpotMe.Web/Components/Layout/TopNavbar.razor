@@ -1,5 +1,6 @@
 @using SpotMe.Web.Services
 @using SpotMe.Web.Models
+@using SpotMe.Web.Components
 @implements IDisposable
 @inject IJSRuntime JsRuntime
 @inject SpotifyService SpotifyService
@@ -21,17 +22,21 @@
             <i class="bi bi-info-circle"></i>
             <span>About</span>
         </a>
-        <a href="/demo" class="@GetActiveClass("/demo")">
-            <i class="bi bi-infinity"></i>
-            <span>Demo</span>
-        </a>
         @if (_isAuthenticated)
         {
             <a href="/playlists" class="@GetActiveClass("/playlists")">
                 <i class="bi bi-music-note-list"></i>
                 <span>Playlists</span>
             </a>
+            <a href="/record-player" class="@GetActiveClass("/record-player")">
+                <i class="bi bi-music-note"></i>
+                <span>Record Player</span>
+            </a>
         }
+    </div>
+    
+    <div class="player-section">
+        <SpotifyPlayer />
     </div>
     
     <div class="user-section">

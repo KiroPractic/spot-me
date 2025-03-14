@@ -1,0 +1,18 @@
+@page "/record-player"
+
+<div class="record-player">
+  <div class="record @(isPlaying ? "spin" : "")">
+    <img src="@ImageUrl" class="center-image" alt="Album Art" />
+  </div>
+  <button @onclick="TogglePlay">@((isPlaying ? "Stop" : "Play"))</button>
+</div>
+
+@code {
+    bool isPlaying = false;
+    // You can set this dynamically from your app
+    [Parameter] public string ImageUrl { get; set; } = "default-album.jpg";
+
+    void TogglePlay() {
+        isPlaying = !isPlaying;
+    }
+}
