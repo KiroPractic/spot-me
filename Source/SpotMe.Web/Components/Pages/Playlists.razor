@@ -3,11 +3,13 @@
 @using SpotMe.Web.Services
 @using System.Threading
 @using Microsoft.AspNetCore.Components.Web.Virtualization
+@using SpotMe.Web.Components.Pages
+@using SpotMe.Web.Components.Shared
 @rendermode InteractiveServer
 @inject SpotifyService AuthService
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JSRuntime
-@implements IDisposable
+@implements IAsyncDisposable
 
 <PageTitle>My Playlists - SpotMe</PageTitle>
 

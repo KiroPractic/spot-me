@@ -21,6 +21,10 @@
             <i class="bi bi-info-circle"></i>
             <span>About</span>
         </a>
+        <a href="/demo" class="@GetActiveClass("/demo")">
+            <i class="bi bi-infinity"></i>
+            <span>Demo</span>
+        </a>
         @if (_isAuthenticated)
         {
             <a href="/playlists" class="@GetActiveClass("/playlists")">
