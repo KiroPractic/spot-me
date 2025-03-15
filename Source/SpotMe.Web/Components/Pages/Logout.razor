@@ -1,8 +1,5 @@
 @page "/logout"
-@using SpotMe.Web.Services
-@using Microsoft.AspNetCore.Components
-@inject SpotifyService SpotifyService
-@inject NavigationManager NavigationManager
+@inject IJSRuntime JsRuntime
 @rendermode InteractiveServer
 
 <div class="logout-page">
@@ -15,31 +12,12 @@
 </div>
 
 @code {
-    protected override async Task OnInitializedAsync()
-    {
-        await HandleLogout();
-    }
 
-    private async Task HandleLogout()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        try
+        if (firstRender)
         {
-            Console.WriteLine("Logout page - HandleLogout: Clearing access token");
-            
-            // Always clear the token, even if it might not exist
-            await SpotifyService.ClearAccessTokenAsync();
-            Console.WriteLine("Logout page - HandleLogout: Token cleared, navigating to auth page");
-            
-            // Add a small delay to ensure the UI shows before redirecting
-            await Task.Delay(1000);
-            
-            NavigationManager.NavigateTo("/auth", forceLoad: true);
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"Error during logout: {ex.Message}");
-            // Still try to navigate away even if there was an error
-            NavigationManager.NavigateTo("/auth");
+            await JsRuntime.InvokeVoidAsync("logoutUser");
         }
     }
 }
