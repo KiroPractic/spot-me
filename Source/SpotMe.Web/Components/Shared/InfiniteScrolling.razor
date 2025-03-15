@@ -38,8 +38,13 @@
     [JSInvokable]
     public async Task LoadMoreItems()
     {
+        Console.WriteLine($"InfiniteScrolling.LoadMoreItems called, current item count: {_items.Count}");
+        
         if (_loading)
+        {
+            Console.WriteLine("Already loading, skipping");
             return;
+        }
 
         _loading = true;
         try
@@ -49,28 +54,43 @@
             StateHasChanged(); // Allow the UI to display the loading indicator
             try
             {
+                Console.WriteLine("Calling ItemsProvider");
                 var newItems = await ItemsProvider(new InfiniteScrollingItemsProviderRequest(_items.Count, _loadItemsCts.Token));
+                Console.WriteLine($"ItemsProvider returned {newItems.Count()} items");
 
                 var previousCount = _items.Count;
                 _items.AddRange(newItems);
 
+                Console.WriteLine($"Added items, new count: {_items.Count}, previous count: {previousCount}");
+                
                 if (_items.Count == previousCount)
                 {
                     _enumerationCompleted = true;
+                    Console.WriteLine("No new items, enumeration completed");
                 }
                 else
                 {
-                    await _instance.InvokeVoidAsync("onNewItems");
+                    Console.WriteLine("Notifying JS of new items");
+                    if (_instance != null)
+                    {
+                        await _instance.InvokeVoidAsync("onNewItems");
+                    }
                 }
             }
             catch (OperationCanceledException oce) when (oce.CancellationToken == _loadItemsCts.Token)
             {
+                Console.WriteLine("Operation was canceled");
                 // No-op; we canceled the operation, so it's fine to suppress this exception.
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Error in LoadMoreItems: {ex.Message}");
             }
         }
         finally
         {
             _loading = false;
+            Console.WriteLine("LoadMoreItems completed, loading = false");
         }
 
         StateHasChanged(); // Display the new items and hide the loading indicator
@@ -78,13 +98,57 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        Console.WriteLine($"InfiniteScrolling.OnAfterRenderAsync called, firstRender: {firstRender}");
+        
         // Initialize the IntersectionObserver
         if (firstRender)
         {
-            _module = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "/js/infinite-scrolling.js");
-            _currentComponentReference = DotNetObjectReference.Create(this);
-            _instance = await _module.InvokeAsync<IJSObjectReference>("initialize", _lastItemIndicator, _currentComponentReference);
+            try
+            {
+                Console.WriteLine("InfiniteScrolling - Initializing JS module");
+                _module = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "/js/infinite-scrolling.js");
+                _currentComponentReference = DotNetObjectReference.Create(this);
+                _instance = await _module.InvokeAsync<IJSObjectReference>("initialize", _lastItemIndicator, _currentComponentReference);
+                Console.WriteLine("InfiniteScrolling - JS initialization complete");
+                
+                // Manually trigger the first load if no items are loaded yet
+                if (_items.Count == 0 && !_loading)
+                {
+                    Console.WriteLine("InfiniteScrolling - Manually triggering first load");
+                    await LoadMoreItems();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Error initializing infinite scrolling: {ex.Message}");
+            }
         }
+    }
+
+    // Method to refresh the data - clears existing items and starts loading from the beginning
+    public async Task RefreshDataAsync()
+    {
+        Console.WriteLine("InfiniteScrolling.RefreshDataAsync called");
+        
+        // Cancel any existing load operation
+        if (_loadItemsCts != null)
+        {
+            _loadItemsCts.Cancel();
+            _loadItemsCts.Dispose();
+            _loadItemsCts = new CancellationTokenSource();
+        }
+        
+        // Clear items and reset state
+        _items.Clear();
+        _enumerationCompleted = false;
+        
+        // Trigger UI update
+        StateHasChanged();
+        
+        // Load the first batch
+        Console.WriteLine("InfiniteScrolling - About to call LoadMoreItems");
+        await LoadMoreItems();
+        Console.WriteLine("InfiniteScrolling - LoadMoreItems completed");
     }
 
     public async ValueTask DisposeAsync()

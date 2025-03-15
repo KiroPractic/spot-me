@@ -651,12 +651,39 @@ public class SpotifyService
         }
     }
     
-    // Get tracks for a specific playlist
+    // Get tracks for a specific playlist, handling both regular playlists and the liked songs playlist
     public async Task<List<PlaylistTrack>?> GetPlaylistTracksAsync(string playlistId, int limit = 50, int offset = 0)
     {
-        var token = await GetAccessTokenAsync();
-        if (string.IsNullOrEmpty(token) || string.IsNullOrEmpty(playlistId))
+        if (string.IsNullOrEmpty(playlistId))
         {
+            Console.Error.WriteLine("GetPlaylistTracksAsync: playlistId is null or empty");
+            return null;
+        }
+        
+        // Special case for liked songs playlist
+        if (playlistId == "liked")
+        {
+            return await GetLikedSongsPlaylistTracksAsync(limit, offset);
+        }
+        
+        // Regular playlist tracks
+        return await GetRegularPlaylistTracksAsync(playlistId, limit, offset);
+    }
+    
+    // Private method to get liked songs as a playlist
+    private async Task<List<PlaylistTrack>?> GetLikedSongsPlaylistTracksAsync(int limit = 50, int offset = 0)
+    {
+        Console.WriteLine($"GetLikedSongsPlaylistTracksAsync: Fetching liked songs, limit={limit}, offset={offset}");
+        return await GetLikedTracksAsync(limit, offset);
+    }
+    
+    // Private method to get tracks from a regular playlist
+    private async Task<List<PlaylistTrack>?> GetRegularPlaylistTracksAsync(string playlistId, int limit = 50, int offset = 0)
+    {
+        var token = await GetAccessTokenAsync();
+        if (string.IsNullOrEmpty(token))
+        {
+            Console.Error.WriteLine("GetRegularPlaylistTracksAsync: No token available");
             return null;
         }
         
@@ -664,6 +691,8 @@ public class SpotifyService
         {
             // Make sure limit isn't larger than what the API supports (usually 50 or 100)
             int validLimit = Math.Min(limit, 50);
+            
+            Console.WriteLine($"GetRegularPlaylistTracksAsync: Fetching tracks for playlist {playlistId}, limit={validLimit}, offset={offset}");
             
             var request = new HttpRequestMessage(
                 HttpMethod.Get, 
@@ -679,15 +708,16 @@ public class SpotifyService
                 var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
                 var paginatedResponse = JsonSerializer.Deserialize<PaginatedPlaylistTracksResponse>(content, options);
                 
+                Console.WriteLine($"GetRegularPlaylistTracksAsync: Retrieved {paginatedResponse?.Items?.Count ?? 0} tracks");
                 return paginatedResponse?.Items;
             }
             
-            await _jsRuntime.InvokeVoidAsync("console.error", $"Failed to get playlist tracks: {response.StatusCode}");
+            Console.Error.WriteLine($"GetRegularPlaylistTracksAsync: Failed to get playlist tracks: {response.StatusCode}");
             return null;
         }
         catch (Exception ex)
         {
-            await _jsRuntime.InvokeVoidAsync("console.error", $"Error getting playlist tracks: {ex.Message}");
+            Console.Error.WriteLine($"GetRegularPlaylistTracksAsync: Error getting playlist tracks: {ex.Message}");
             return null;
         }
     }
@@ -954,6 +984,78 @@ public class SpotifyService
         catch (Exception ex)
         {
             Console.Error.WriteLine($"GetRecentlyPlayedTrackAsync: Exception: {ex.Message}");
+            return null;
+        }
+    }
+    
+    // Get a playlist by its ID, supporting both regular playlists and the special "liked" songs playlist
+    public async Task<SpotifyPlaylist?> GetPlaylistByIdAsync(string playlistId)
+    {
+        Console.WriteLine($"GetPlaylistByIdAsync: Starting to fetch playlist with ID: {playlistId}");
+        
+        // Handle special case for liked songs
+        if (playlistId == "liked")
+        {
+            Console.WriteLine("GetPlaylistByIdAsync: Handling special case for liked songs");
+            var likedSongsCount = await GetSavedTracksCountAsync();
+            
+            return new SpotifyPlaylist 
+            {
+                Id = "liked",
+                Name = "Liked Songs",
+                Description = "Songs you've liked on Spotify",
+                Images = new List<ImageInfo> 
+                { 
+                    new ImageInfo 
+                    { 
+                        Url = "https://misc.scdn.co/liked-songs/liked-songs-300.png",
+                        Height = 300,
+                        Width = 300
+                    } 
+                },
+                Tracks = new PlaylistTracksRef { Total = likedSongsCount },
+                ExternalUrls = new ExternalUrls { Spotify = "https://open.spotify.com/collection/tracks" }
+            };
+        }
+        
+        // For regular playlist
+        var token = await GetAccessTokenAsync();
+        if (string.IsNullOrEmpty(token))
+        {
+            Console.WriteLine("GetPlaylistByIdAsync: No token available");
+            return null;
+        }
+        
+        try 
+        {
+            var request = new HttpRequestMessage(
+                HttpMethod.Get, 
+                $"https://api.spotify.com/v1/playlists/{playlistId}"
+            );
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            
+            var response = await _httpClient.SendAsync(request);
+            Console.WriteLine($"GetPlaylistByIdAsync: API response status: {response.StatusCode}");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                var playlist = JsonSerializer.Deserialize<SpotifyPlaylist>(content, options);
+                
+                Console.WriteLine($"GetPlaylistByIdAsync: Retrieved playlist '{playlist?.Name}' with {playlist?.Tracks?.Total} tracks");
+                return playlist;
+            }
+            
+            // Handle error cases
+            var errorContent = await response.Content.ReadAsStringAsync();
+            Console.Error.WriteLine($"GetPlaylistByIdAsync: Failed to get playlist: {response.StatusCode}");
+            Console.Error.WriteLine($"GetPlaylistByIdAsync: Error details: {errorContent}");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"GetPlaylistByIdAsync: Error getting playlist: {ex.Message}");
             return null;
         }
     }
