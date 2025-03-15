@@ -6,56 +6,56 @@
 @implements IDisposable
 @rendermode InteractiveServer
 
-<div class="record-player-page" style="background-color: #121212; padding: 40px; min-height: 80vh; display: flex; justify-content: center; align-items: center;">
+<div class="record-player-page">
     @if (!_isAuthenticated)
     {
-        <div class="auth-message" style="background-color: #272727; padding: 30px; border-radius: 10px; text-align: center; max-width: 400px;">
+        <div class="auth-message">
             <p>Please login with Spotify to use the Record Player</p>
-            <button @onclick="AuthenticateWithSpotify" style="background-color: #1DB954; color: white; border: none; border-radius: 30px; padding: 12px 24px; font-size: 16px; font-weight: bold; display: flex; align-items: center; justify-content: center; margin: 20px auto 0; cursor: pointer;">
-                <i class="bi bi-spotify" style="margin-right: 8px;"></i>
+            <button @onclick="AuthenticateWithSpotify" class="spotify-login-button">
+                <i class="bi bi-spotify"></i>
                 Sign in with Spotify
             </button>
         </div>
     }
     else
     {
-        <div style="background-color: #2c2722; border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); padding: 40px; width: 100%; max-width: 600px; display: flex; flex-direction: column; align-items: center; gap: 40px; position: relative;">
-            <div style="position: relative; width: 340px; height: 340px; display: flex; justify-content: center; align-items: center; background-color: #1a1a1a; border-radius: 50%; box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.8);">
-                <div class="@(_isPlaying ? "spin" : "")" style="width: 300px; height: 300px; border-radius: 50%; background-color: #111111; position: relative; display: flex; justify-content: center; align-items: center; box-shadow: 0 5px 20px rgba(0, 0, 0, 0.5);">
-                    <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; border-radius: 50%; background: repeating-radial-gradient(circle at center, rgba(0, 0, 0, 0.8) 0px, rgba(20, 20, 20, 0.8) 1px, rgba(0, 0, 0, 0.8) 2px, rgba(20, 20, 20, 0.8) 3px); z-index: 1;"></div>
-                    <div style="width: 120px; height: 120px; border-radius: 50%; background-color: #e8e8e8; overflow: hidden; display: flex; justify-content: center; align-items: center; z-index: 2; box-shadow: 0 0 10px rgba(0, 0, 0, 0.3); border: 1px solid #000;">
+        <div class="turntable">
+            <div class="turntable-platter">
+                <div class="vinyl @(_isPlaying ? "spin" : "")">
+                    <div class="vinyl-grooves"></div>
+                    <div class="vinyl-label">
                         @if (!string.IsNullOrEmpty(_currentTrackImageUrl))
                         {
-                            <img src="@_currentTrackImageUrl" alt="Album Cover" style="width: 100%; height: 100%; object-fit: cover;"/>
+                            <img src="@_currentTrackImageUrl" alt="Album Cover"/>
                         }
                         else
                         {
-                            <div style="width: 100%; height: 100%; background-color: #1DB954; display: flex; justify-content: center; align-items: center; color: white;">
-                                <i class="bi bi-music-note" style="font-size: 40px;"></i>
+                            <div class="vinyl-label-placeholder">
+                                <i class="bi bi-music-note"></i>
                             </div>
                         }
                     </div>
                 </div>
 
-                <div class="@(_isPlaying ? "playing" : "")" style="position: absolute; top: 30px; right: 40px; transform-origin: top right; transform: rotate(-30deg); transition: transform 0.8s cubic-bezier(0.17, 0.67, 0.83, 0.67); z-index: 10;">
-                    <div style="position: absolute; top: 0; right: 0; width: 40px; height: 40px; border-radius: 50%; background-color: #999; border: 3px solid #777; box-shadow: -2px 2px 5px rgba(0, 0, 0, 0.3);"></div>
-                    <div style="position: absolute; top: 20px; right: 20px; width: 160px; height: 10px; background-color: #888; transform-origin: top right; transform: rotate(0deg); box-shadow: -2px 2px 5px rgba(0, 0, 0, 0.3);"></div>
-                    <div style="position: absolute; left: -10px; top: -8px; width: 24px; height: 26px; background-color: #777; border-radius: 5px; box-shadow: -2px 2px 5px rgba(0, 0, 0, 0.3);"></div>
+                <div class="tonearm @(_isPlaying ? "playing" : "")">
+                    <div class="tonearm-base"></div>
+                    <div class="tonearm-arm"></div>
+                    <div class="tonearm-head"></div>
                 </div>
             </div>
 
-            <div style="width: 100%; display: flex; flex-direction: column; gap: 20px; background-color: #201a16; border-radius: 15px; padding: 20px; box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.4);">
-                <div style="text-align: center; padding-bottom: 15px; border-bottom: 1px solid rgba(255, 255, 255, 0.1);">
-                    <div style="font-size: 18px; font-weight: bold; color: white; margin-bottom: 5px;">@_currentTrackName</div>
-                    <div style="font-size: 14px; color: #b3b3b3;">@_currentTrackArtist</div>
+            <div class="player-controls">
+                <div class="track-info">
+                    <div class="track-name">@_currentTrackName</div>
+                    <div class="track-artist">@_currentTrackArtist</div>
                 </div>
 
-                <div style="display: flex; justify-content: center; align-items: center; gap: 20px;">
-                    <button @onclick="PreviousTrack" disabled="@(!_isPlayerReady || !_isPlaying)" style="background: none; border: none; color: #d1d1d1; cursor: pointer; transition: all 0.2s ease; font-size: 24px; @((!_isPlayerReady || !_isPlaying) ? "color: #555; cursor: not-allowed;" : "")">
+                <div class="playback-controls">
+                    <button class="control-btn" @onclick="PreviousTrack" disabled="@(!_isPlayerReady || !_isPlaying)">
                         <i class="bi bi-skip-backward-fill"></i>
                     </button>
 
-                    <button @onclick="TogglePlayback" style="background: none; border: none; cursor: pointer; transition: all 0.2s ease; font-size: 48px; color: #1DB954;">
+                    <button class="play-button" @onclick="TogglePlayback">
                         @if (_isPlaying)
                         {
                             <i class="bi bi-pause-circle-fill"></i>
@@ -66,35 +66,20 @@
                         }
                     </button>
 
-                    <button @onclick="NextTrack" disabled="@(!_isPlayerReady || !_isPlaying)" style="background: none; border: none; color: #d1d1d1; cursor: pointer; transition: all 0.2s ease; font-size: 24px; @((!_isPlayerReady || !_isPlaying) ? "color: #555; cursor: not-allowed;" : "")">
+                    <button class="control-btn" @onclick="NextTrack" disabled="@(!_isPlayerReady || !_isPlaying)">
                         <i class="bi bi-skip-forward-fill"></i>
                     </button>
                 </div>
 
-                <div style="display: flex; align-items: center; justify-content: center; gap: 15px; margin-top: 10px;">
-                    <i class="bi bi-volume-down" style="color: #b3b3b3; font-size: 16px;"></i>
-                    <input type="range" min="0" max="100" @bind="_volumeLevel" @oninput="HandleVolumeChange" style="width: 200px; height: 5px;"/>
-                    <i class="bi bi-volume-up" style="color: #b3b3b3; font-size: 16px;"></i>
+                <div class="volume-control">
+                    <i class="bi bi-volume-down"></i>
+                    <input type="range" min="0" max="100" @bind="_volumeLevel" @oninput="HandleVolumeChange" class="volume-slider"/>
+                    <i class="bi bi-volume-up"></i>
                 </div>
             </div>
         </div>
     }
 </div>
-
-<style>
-    .spin {
-        animation: recordspin 8s linear infinite;
-    }
-
-    .playing {
-        transform: rotate(10deg) !important;
-    }
-
-    @@keyframes recordspin {
-        from { transform: rotate(0deg); }
-        to { transform: rotate(360deg); }
-    }
-</style>
 
 @code {
     private bool _isAuthenticated = false;
