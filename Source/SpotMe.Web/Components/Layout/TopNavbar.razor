@@ -54,10 +54,10 @@
                 <span class="username">@GetCurrentUsername()</span>
             </div>
             
-            <button @onclick="HandleLogout" class="logout-btn">
+            <a href="/logout" class="logout-btn">
                 <i class="bi bi-box-arrow-right"></i>
                 <span>Logout</span>
-            </button>
+            </a>
         }
         else
         {
@@ -227,14 +227,7 @@
         }
     }
     
-    private async Task HandleLogout()
-    {
-        await SpotifyService.ClearAccessTokenAsync();
-        _isAuthenticated = false;
-        _userProfile = null;
-        StateHasChanged();
-        NavigationManager.NavigateTo("/auth");
-    }
+    // Logout is now handled by the dedicated /logout page
     
     private async Task AuthenticateWithSpotify()
     {

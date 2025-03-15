@@ -225,6 +225,19 @@ public class SpotifyService
                             
                             return _accessToken;
                         }
+                        else
+                        {
+                            // Token has expired - redirect to logout page
+                            Console.WriteLine("Token has expired - redirecting to logout page");
+                            try
+                            {
+                                await _jsRuntime.InvokeVoidAsync("window.location.replace", "/logout");
+                            }
+                            catch (InvalidOperationException)
+                            {
+                                // This can happen during prerendering, just ignore it
+                            }
+                        }
                     }
                 }
                 
