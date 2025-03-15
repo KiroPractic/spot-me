@@ -1,32 +1,316 @@
-.record-player {
-  text-align: center;
-  margin-top: 20px;
+.record-player-page {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 80vh;
+    padding: 2rem;
+    background-color: #121212;
 }
 
-.record {
-  width: 300px;
-  height: 300px;
-  border-radius: 50%;
-  background-color: #222;
-  margin: 0 auto;
-  position: relative;
+.auth-message {
+    text-align: center;
+    background-color: rgba(0, 0, 0, 0.7);
+    padding: 2rem;
+    border-radius: 8px;
+    max-width: 400px;
 }
 
-.center-image {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 100px;
-  height: 100px;
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
+.spotify-login-button {
+    background-color: #1DB954;
+    color: white;
+    border: none;
+    border-radius: 30px;
+    padding: 12px 24px;
+    font-size: 16px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    margin: 1rem auto 0;
+    transition: all 0.2s ease;
+}
+
+.spotify-login-button:hover {
+    background-color: #1ed760;
+    transform: scale(1.05);
+}
+
+.spotify-login-button i {
+    margin-right: 8px;
+    font-size: 20px;
+}
+
+/* Turntable styling */
+.turntable {
+    background-color: #5A432F;
+    border-radius: 16px;
+    padding: 2rem;
+    width: 100%;
+    max-width: 700px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+.turntable:before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 20px;
+    background: linear-gradient(to right, #4a3526, #6b5038, #4a3526);
+    border-radius: 16px 16px 0 0;
+}
+
+.turntable-platter {
+    position: relative;
+    height: 320px;
+    display: flex;
+    justify-content: center;
+}
+
+.vinyl {
+    width: 300px;
+    height: 300px;
+    border-radius: 50%;
+    background-color: #121212;
+    position: relative;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    transform-origin: center center;
+    transition: transform 0.5s ease;
+}
+
+.vinyl-grooves {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: 50%;
+    overflow: hidden;
+}
+
+.vinyl-grooves:before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: 50%;
+    background: 
+        radial-gradient(
+            circle at center,
+            #000 18%,
+            transparent 18.5%
+        ),
+        repeating-radial-gradient(
+            circle at center,
+            rgba(0, 0, 0, 0.7) 0px,
+            rgba(30, 30, 30, 0.5) 1px,
+            rgba(0, 0, 0, 0.7) 2px,
+            rgba(30, 30, 30, 0.5) 3px,
+            rgba(0, 0, 0, 0.7) 4px,
+            rgba(30, 30, 30, 0.5) 5px
+        );
+    box-shadow: inset 0 0 20px rgba(255, 255, 255, 0.1);
+}
+
+.vinyl-label {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    background-color: #e0e0e0;
+    transform: translate(-50%, -50%);
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 0 0 5px rgba(0, 0, 0, 0.1);
+}
+
+.vinyl-label img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.vinyl-label-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #1DB954;
+    color: white;
+}
+
+.vinyl-label-placeholder i {
+    font-size: 40px;
 }
 
 .spin {
-  animation: spin 2s linear infinite;
+    animation: spin 8s linear infinite;
 }
 
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Tonearm styling */
+.tonearm {
+    position: absolute;
+    top: 10px;
+    right: 40px;
+    transform-origin: 100% 0;
+    transition: transform 0.8s cubic-bezier(.08,.82,.17,1);
+    z-index: 10;
+}
+
+.tonearm.playing {
+    transform: rotate(40deg);
+}
+
+.tonearm-base {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background-color: #ccc;
+    border: 3px solid #999;
+}
+
+.tonearm-arm {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    width: 130px;
+    height: 8px;
+    background-color: #aaa;
+    transform-origin: 100% 50%;
+    transform: rotate(0deg);
+}
+
+.tonearm-head {
+    position: absolute;
+    left: 0;
+    top: -5px;
+    width: 20px;
+    height: 18px;
+    background-color: #888;
+    border-radius: 3px;
+}
+
+/* Player controls */
+.player-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    background-color: #4A3526;
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.3);
+}
+
+.track-info {
+    text-align: center;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.track-name {
+    font-size: 1.2rem;
+    font-weight: bold;
+    margin-bottom: 0.2rem;
+    color: white;
+}
+
+.track-artist {
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.playback-controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.control-btn, .play-button {
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.8);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.control-btn {
+    font-size: 1.5rem;
+}
+
+.play-button {
+    font-size: 2.5rem;
+    color: #1DB954;
+}
+
+.control-btn:hover, .play-button:hover {
+    color: white;
+    transform: scale(1.1);
+}
+
+.control-btn:disabled {
+    color: rgba(255, 255, 255, 0.3);
+    cursor: not-allowed;
+}
+
+.volume-control {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.8rem;
+    margin-top: 0.5rem;
+}
+
+.volume-control i {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 1rem;
+}
+
+.volume-slider {
+    -webkit-appearance: none;
+    width: 150px;
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.2);
+    outline: none;
+}
+
+.volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #1DB954;
+    cursor: pointer;
+}
+
+.volume-slider::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #1DB954;
+    cursor: pointer;
 }

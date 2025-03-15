@@ -1,18 +1,298 @@
 @page "/record-player"
+@using SpotMe.Web.Services
+@inject IJSRuntime JsRuntime
+@inject SpotifyService SpotifyService
+@inject NavigationManager NavigationManager
+@implements IDisposable
+@rendermode InteractiveServer
 
-<div class="record-player">
-  <div class="record @(isPlaying ? "spin" : "")">
-    <img src="@ImageUrl" class="center-image" alt="Album Art" />
-  </div>
-  <button @onclick="TogglePlay">@((isPlaying ? "Stop" : "Play"))</button>
+<div class="record-player-page" style="background-color: #121212; padding: 40px; min-height: 80vh; display: flex; justify-content: center; align-items: center;">
+    @if (!_isAuthenticated)
+    {
+        <div class="auth-message" style="background-color: #272727; padding: 30px; border-radius: 10px; text-align: center; max-width: 400px;">
+            <p>Please login with Spotify to use the Record Player</p>
+            <button @onclick="AuthenticateWithSpotify" style="background-color: #1DB954; color: white; border: none; border-radius: 30px; padding: 12px 24px; font-size: 16px; font-weight: bold; display: flex; align-items: center; justify-content: center; margin: 20px auto 0; cursor: pointer;">
+                <i class="bi bi-spotify" style="margin-right: 8px;"></i>
+                Sign in with Spotify
+            </button>
+        </div>
+    }
+    else
+    {
+        <div style="background-color: #2c2722; border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); padding: 40px; width: 100%; max-width: 600px; display: flex; flex-direction: column; align-items: center; gap: 40px; position: relative;">
+            <div style="position: relative; width: 340px; height: 340px; display: flex; justify-content: center; align-items: center; background-color: #1a1a1a; border-radius: 50%; box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.8);">
+                <div class="@(_isPlaying ? "spin" : "")" style="width: 300px; height: 300px; border-radius: 50%; background-color: #111111; position: relative; display: flex; justify-content: center; align-items: center; box-shadow: 0 5px 20px rgba(0, 0, 0, 0.5);">
+                    <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; border-radius: 50%; background: repeating-radial-gradient(circle at center, rgba(0, 0, 0, 0.8) 0px, rgba(20, 20, 20, 0.8) 1px, rgba(0, 0, 0, 0.8) 2px, rgba(20, 20, 20, 0.8) 3px); z-index: 1;"></div>
+                    <div style="width: 120px; height: 120px; border-radius: 50%; background-color: #e8e8e8; overflow: hidden; display: flex; justify-content: center; align-items: center; z-index: 2; box-shadow: 0 0 10px rgba(0, 0, 0, 0.3); border: 1px solid #000;">
+                        @if (!string.IsNullOrEmpty(_currentTrackImageUrl))
+                        {
+                            <img src="@_currentTrackImageUrl" alt="Album Cover" style="width: 100%; height: 100%; object-fit: cover;"/>
+                        }
+                        else
+                        {
+                            <div style="width: 100%; height: 100%; background-color: #1DB954; display: flex; justify-content: center; align-items: center; color: white;">
+                                <i class="bi bi-music-note" style="font-size: 40px;"></i>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <div class="@(_isPlaying ? "playing" : "")" style="position: absolute; top: 30px; right: 40px; transform-origin: top right; transform: rotate(-30deg); transition: transform 0.8s cubic-bezier(0.17, 0.67, 0.83, 0.67); z-index: 10;">
+                    <div style="position: absolute; top: 0; right: 0; width: 40px; height: 40px; border-radius: 50%; background-color: #999; border: 3px solid #777; box-shadow: -2px 2px 5px rgba(0, 0, 0, 0.3);"></div>
+                    <div style="position: absolute; top: 20px; right: 20px; width: 160px; height: 10px; background-color: #888; transform-origin: top right; transform: rotate(0deg); box-shadow: -2px 2px 5px rgba(0, 0, 0, 0.3);"></div>
+                    <div style="position: absolute; left: -10px; top: -8px; width: 24px; height: 26px; background-color: #777; border-radius: 5px; box-shadow: -2px 2px 5px rgba(0, 0, 0, 0.3);"></div>
+                </div>
+            </div>
+
+            <div style="width: 100%; display: flex; flex-direction: column; gap: 20px; background-color: #201a16; border-radius: 15px; padding: 20px; box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.4);">
+                <div style="text-align: center; padding-bottom: 15px; border-bottom: 1px solid rgba(255, 255, 255, 0.1);">
+                    <div style="font-size: 18px; font-weight: bold; color: white; margin-bottom: 5px;">@_currentTrackName</div>
+                    <div style="font-size: 14px; color: #b3b3b3;">@_currentTrackArtist</div>
+                </div>
+
+                <div style="display: flex; justify-content: center; align-items: center; gap: 20px;">
+                    <button @onclick="PreviousTrack" disabled="@(!_isPlayerReady || !_isPlaying)" style="background: none; border: none; color: #d1d1d1; cursor: pointer; transition: all 0.2s ease; font-size: 24px; @((!_isPlayerReady || !_isPlaying) ? "color: #555; cursor: not-allowed;" : "")">
+                        <i class="bi bi-skip-backward-fill"></i>
+                    </button>
+
+                    <button @onclick="TogglePlayback" style="background: none; border: none; cursor: pointer; transition: all 0.2s ease; font-size: 48px; color: #1DB954;">
+                        @if (_isPlaying)
+                        {
+                            <i class="bi bi-pause-circle-fill"></i>
+                        }
+                        else
+                        {
+                            <i class="bi bi-play-circle-fill"></i>
+                        }
+                    </button>
+
+                    <button @onclick="NextTrack" disabled="@(!_isPlayerReady || !_isPlaying)" style="background: none; border: none; color: #d1d1d1; cursor: pointer; transition: all 0.2s ease; font-size: 24px; @((!_isPlayerReady || !_isPlaying) ? "color: #555; cursor: not-allowed;" : "")">
+                        <i class="bi bi-skip-forward-fill"></i>
+                    </button>
+                </div>
+
+                <div style="display: flex; align-items: center; justify-content: center; gap: 15px; margin-top: 10px;">
+                    <i class="bi bi-volume-down" style="color: #b3b3b3; font-size: 16px;"></i>
+                    <input type="range" min="0" max="100" @bind="_volumeLevel" @oninput="HandleVolumeChange" style="width: 200px; height: 5px;"/>
+                    <i class="bi bi-volume-up" style="color: #b3b3b3; font-size: 16px;"></i>
+                </div>
+            </div>
+        </div>
+    }
 </div>
 
-@code {
-    bool isPlaying = false;
-    // You can set this dynamically from your app
-    [Parameter] public string ImageUrl { get; set; } = "default-album.jpg";
-
-    void TogglePlay() {
-        isPlaying = !isPlaying;
+<style>
+    .spin {
+        animation: recordspin 8s linear infinite;
     }
+
+    .playing {
+        transform: rotate(10deg) !important;
+    }
+
+    @@keyframes recordspin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+</style>
+
+@code {
+    private bool _isAuthenticated = false;
+    private bool _isPlayerReady = false;
+    private bool _isPlaying = false;
+    private string _currentTrackName = "Not Playing";
+    private string _currentTrackArtist = "No Artist";
+    private string _currentTrackImageUrl = "";
+    private int _volumeLevel = 50;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Check if user is authenticated
+        var token = await SpotifyService.GetAccessTokenAsync();
+        _isAuthenticated = !string.IsNullOrEmpty(token);
+
+        if (_isAuthenticated)
+        {
+            await InitializePlayer();
+            await FetchCurrentPlaybackState();
+        }
+
+        // Listen for Spotify authentication state changes
+        SpotifyService.OnAuthStateChanged += HandleAuthStateChanged;
+    }
+
+    private async void HandleAuthStateChanged(bool isAuthenticated)
+    {
+        _isAuthenticated = isAuthenticated;
+
+        if (isAuthenticated)
+        {
+            await InitializePlayer();
+            await FetchCurrentPlaybackState();
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task InitializePlayer()
+    {
+        try
+        {
+            var token = await SpotifyService.GetAccessTokenAsync();
+            if (!string.IsNullOrEmpty(token))
+            {
+                await JsRuntime.InvokeVoidAsync("spotifyPlayer.initialize", token, DotNetObjectReference.Create(this));
+                _isPlayerReady = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error initializing player: {ex.Message}");
+        }
+    }
+
+    private async Task FetchCurrentPlaybackState()
+    {
+        try
+        {
+            var playbackState = await SpotifyService.GetCurrentPlaybackStateAsync();
+
+            if (playbackState != null)
+            {
+                _isPlaying = playbackState.IsPlaying;
+                _currentTrackName = playbackState.TrackName;
+                _currentTrackArtist = playbackState.ArtistName;
+                _currentTrackImageUrl = playbackState.ImageUrl;
+                StateHasChanged();
+            }
+            else
+            {
+                // Try to get recently played if no current playback
+                var recentTrack = await SpotifyService.GetRecentlyPlayedTrackAsync();
+
+                if (recentTrack != null)
+                {
+                    _isPlaying = false; // Recent track is not currently playing
+                    _currentTrackName = recentTrack.TrackName;
+                    _currentTrackArtist = recentTrack.ArtistName;
+                    _currentTrackImageUrl = recentTrack.ImageUrl;
+                    StateHasChanged();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error fetching playback state: {ex.Message}");
+        }
+    }
+
+    private async Task TogglePlayback()
+    {
+        if (!_isPlayerReady)
+            return;
+
+        try
+        {
+            if (_isPlaying)
+            {
+                await JsRuntime.InvokeVoidAsync("spotifyPlayer.pause");
+                _isPlaying = false;
+            }
+            else
+            {
+                await JsRuntime.InvokeVoidAsync("spotifyPlayer.play");
+                _isPlaying = true;
+            }
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error toggling playback: {ex.Message}");
+        }
+    }
+
+    private async Task PreviousTrack()
+    {
+        if (!_isPlayerReady || !_isPlaying)
+            return;
+
+        try
+        {
+            await JsRuntime.InvokeVoidAsync("spotifyPlayer.previousTrack");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error going to previous track: {ex.Message}");
+        }
+    }
+
+    private async Task NextTrack()
+    {
+        if (!_isPlayerReady || !_isPlaying)
+            return;
+
+        try
+        {
+            await JsRuntime.InvokeVoidAsync("spotifyPlayer.nextTrack");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error going to next track: {ex.Message}");
+        }
+    }
+
+    private async Task HandleVolumeChange(ChangeEventArgs e)
+    {
+        if (!_isPlayerReady || e.Value == null)
+            return;
+
+        try
+        {
+            if (int.TryParse(e.Value.ToString(), out int volume))
+            {
+                _volumeLevel = volume;
+                await JsRuntime.InvokeVoidAsync("spotifyPlayer.setVolume", volume / 100.0);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error changing volume: {ex.Message}");
+        }
+    }
+
+    [JSInvokable]
+    public void OnPlaybackStateChanged(bool isPlaying, string trackName, string trackArtist, string imageUrl)
+    {
+        _isPlaying = isPlaying;
+        _currentTrackName = string.IsNullOrEmpty(trackName) ? "Not Playing" : trackName;
+        _currentTrackArtist = string.IsNullOrEmpty(trackArtist) ? "No Artist" : trackArtist;
+        _currentTrackImageUrl = imageUrl;
+        StateHasChanged();
+    }
+
+    private async Task AuthenticateWithSpotify()
+    {
+        try
+        {
+            // Configure auth service
+            var redirectUri = NavigationManager.BaseUri.TrimEnd('/') + "/callback";
+            SpotifyService.Configure("6bf1083c60b743a9841b7db2ca63117b", redirectUri);
+
+            // Generate and navigate to auth URL
+            var authUrl = await SpotifyService.GenerateAuthUrlAsync();
+            NavigationManager.NavigateTo(authUrl);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Authentication error: {ex.Message}");
+        }
+    }
+
+    public void Dispose()
+    {
+        // Unregister from auth events
+        SpotifyService.OnAuthStateChanged -= HandleAuthStateChanged;
+    }
+
 }
