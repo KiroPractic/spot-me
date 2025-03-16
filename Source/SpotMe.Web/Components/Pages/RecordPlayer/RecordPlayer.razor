@@ -20,61 +20,81 @@
     else
     {
         <div class="turntable">
-            <div class="turntable-platter">
-                <div class="vinyl @(_isPlaying ? "spin" : "")">
-                    <div class="vinyl-grooves"></div>
-                    <div class="vinyl-label">
-                        @if (!string.IsNullOrEmpty(_currentTrackImageUrl))
-                        {
-                            <img src="@_currentTrackImageUrl" alt="Album Cover"/>
-                        }
-                        else
-                        {
-                            <div class="vinyl-label-placeholder">
-                                <i class="bi bi-music-note"></i>
-                            </div>
-                        }
+            <div class="turntable-cabinet">
+                <!-- Turntable Platter with integrated controls -->
+                <!-- Turntable Platter -->
+                <div class="turntable-platter">
+                    <!-- Spindle -->
+                    <div class="spindle"></div>
+                    
+                    <!-- Vinyl Record -->
+                    <div class="vinyl @(_isPlaying ? "spin" : "")">
+                        <div class="vinyl-grooves"></div>
+                        <div class="vinyl-label">
+                            @if (!string.IsNullOrEmpty(_currentTrackImageUrl))
+                            {
+                                <img src="@_currentTrackImageUrl" alt="Album Cover"/>
+                            }
+                            else
+                            {
+                                <div class="vinyl-label-placeholder">
+                                    <i class="bi bi-music-note"></i>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                    
+                    <!-- Tonearm -->
+                    <div class="tonearm @(_isPlaying ? "playing" : "")">
+                        <div class="tonearm-base"></div>
+                        <div class="tonearm-arm"></div>
+                        <div class="tonearm-head"></div>
                     </div>
                 </div>
-
-                <div class="tonearm @(_isPlaying ? "playing" : "")">
-                    <div class="tonearm-base"></div>
-                    <div class="tonearm-arm"></div>
-                    <div class="tonearm-head"></div>
-                </div>
-            </div>
-
-            <div class="player-controls">
-                <div class="track-info">
-                    <div class="track-name">@_currentTrackName</div>
-                    <div class="track-artist">@_currentTrackArtist</div>
-                </div>
-
-                <div class="playback-controls">
-                    <button class="control-btn" @onclick="PreviousTrack" disabled="@(!_isPlayerReady || !_isPlaying)">
-                        <i class="bi bi-skip-backward-fill"></i>
-                    </button>
-
-                    <button class="play-button" @onclick="TogglePlayback">
-                        @if (_isPlaying)
-                        {
-                            <i class="bi bi-pause-circle-fill"></i>
-                        }
-                        else
-                        {
-                            <i class="bi bi-play-circle-fill"></i>
-                        }
-                    </button>
-
-                    <button class="control-btn" @onclick="NextTrack" disabled="@(!_isPlayerReady || !_isPlaying)">
-                        <i class="bi bi-skip-forward-fill"></i>
-                    </button>
-                </div>
-
-                <div class="volume-control">
-                    <i class="bi bi-volume-down"></i>
-                    <input type="range" min="0" max="100" @bind="_volumeLevel" @oninput="HandleVolumeChange" class="volume-slider"/>
-                    <i class="bi bi-volume-up"></i>
+                
+                <!-- Controls Panel on Wooden Frame -->
+                <div class="controls-panel">
+                    <!-- Vertical Volume Slider (no label) -->
+                    <div class="volume-slider-container vertical">
+                        <div class="slider-track vertical">
+                            <input type="range" min="0" max="100" value="@_volumeLevel" @onchange="HandleVolumeChange" @oninput="HandleVolumeInput" class="slider-input vertical" orient="vertical" />
+                            <div class="slider-fill vertical" style="height: @(_volumeLevel)%"></div>
+                            <div class="slider-handle vertical" style="bottom: @(_volumeLevel)%"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Playback Controls -->
+                    <div class="controls-center">
+                        <div class="playback-buttons">
+                            <button class="turntable-btn prev-btn" @onclick="PreviousTrack" disabled="@(!_isPlayerReady || !_isPlaying)">
+                                <i class="bi bi-skip-backward-fill"></i>
+                            </button>
+                            
+                            <button class="turntable-btn play-btn" @onclick="TogglePlayback">
+                                @if (_isPlaying)
+                                {
+                                    <i class="bi bi-pause-fill"></i>
+                                }
+                                else
+                                {
+                                    <i class="bi bi-play-fill"></i>
+                                }
+                            </button>
+                            
+                            <button class="turntable-btn next-btn" @onclick="NextTrack" disabled="@(!_isPlayerReady || !_isPlaying)">
+                                <i class="bi bi-skip-forward-fill"></i>
+                            </button>
+                        </div>
+                        
+                        <!-- Track Info below playback buttons (no labels) -->
+                        <div class="track-info-panel">
+                            <div class="track-name">@_currentTrackName</div>
+                            <div class="track-artist">@_currentTrackArtist</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Empty div for symmetry -->
+                    <div class="controls-spacer"></div>
                 </div>
             </div>
         </div>
@@ -243,6 +263,18 @@
         catch (Exception ex)
         {
             Console.Error.WriteLine($"Error changing volume: {ex.Message}");
+        }
+    }
+    
+    private void HandleVolumeInput(ChangeEventArgs e)
+    {
+        if (e.Value == null)
+            return;
+            
+        if (int.TryParse(e.Value.ToString(), out int volume))
+        {
+            _volumeLevel = volume;
+            StateHasChanged();
         }
     }
 
