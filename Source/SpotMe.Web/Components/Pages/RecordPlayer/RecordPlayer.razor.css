@@ -337,13 +337,13 @@
     top: 30px;
     right: 40px;
     transform-origin: top right;
-    transform: rotate(-30deg);
-    transition: transform 0.8s cubic-bezier(0.17, 0.67, 0.83, 0.67);
+    transform: rotate(25deg);
+    transition: transform 0.5s cubic-bezier(0.17, 0.67, 0.83, 0.67);
     z-index: 15;
 }
 
 .tonearm.playing {
-    transform: rotate(10deg);
+    transform: rotate(5deg); /* Inward when playing - toward record */
 }
 
 .tonearm-base {
