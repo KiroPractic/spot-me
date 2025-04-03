@@ -27,6 +27,59 @@ window.spotifyPlayer = {
         }
     },
     
+    // Get the current device ID
+    getDeviceId: function() {
+        console.log("getDeviceId called, returning:", this.deviceId);
+        return this.deviceId || "";
+    },
+    
+    // Transfer playback to this device
+    transferPlayback: async function() {
+        console.log("Transferring playback to this device");
+        if (!this.deviceId || !this.token) {
+            console.error("Cannot transfer playback - missing device ID or token");
+            console.log("Device ID:", this.deviceId);
+            return false;
+        }
+        
+        try {
+            console.log("Making transfer request with device ID:", this.deviceId);
+            
+            const response = await fetch("https://api.spotify.com/v1/me/player", {
+                method: "PUT",
+                headers: {
+                    "Authorization": `Bearer ${this.token}`,
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    device_ids: [this.deviceId],
+                    play: true
+                })
+            });
+            
+            console.log("Transfer response status:", response.status);
+            
+            if (response.status >= 200 && response.status < 300) {
+                console.log("Playback transferred successfully");
+                return true;
+            } else {
+                let errorText = "Unknown error";
+                try {
+                    const errorData = await response.text();
+                    console.error("Transfer error:", errorData);
+                    errorText = errorData;
+                } catch (e) {
+                    console.error("Error getting error text:", e);
+                }
+                console.error(`Failed to transfer playback: ${response.status} - ${errorText}`);
+                return false;
+            }
+        } catch (error) {
+            console.error("Exception transferring playback:", error);
+            return false;
+        }
+    },
+    
     // Initialize the Spotify Web Player
     initialize: function(token, dotNetRef) {
         console.log("Initializing Spotify Web Player with token");

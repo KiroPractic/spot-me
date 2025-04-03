@@ -135,6 +135,9 @@ namespace SpotMe.Web.Services
         public string TrackName { get; set; } = "Not Playing";
         public string ArtistName { get; set; } = "No Artist";
         public string ImageUrl { get; set; } = "";
+        public bool IsPlayingOnCurrentDevice { get; set; } = false;
+        public string? DeviceId { get; set; }
+        public string? DeviceName { get; set; }
     }
     
     // Models for playlist tracks

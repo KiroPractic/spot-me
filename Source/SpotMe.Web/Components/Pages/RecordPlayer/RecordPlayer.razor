@@ -148,6 +148,7 @@
             {
                 await JsRuntime.InvokeVoidAsync("spotifyPlayer.initialize", token, DotNetObjectReference.Create(this));
                 _isPlayerReady = true;
+                Console.WriteLine("Spotify player initialized");
             }
         }
         catch (Exception ex)
@@ -168,6 +169,10 @@
                 _currentTrackName = playbackState.TrackName;
                 _currentTrackArtist = playbackState.ArtistName;
                 _currentTrackImageUrl = playbackState.ImageUrl;
+                
+                // We no longer need to track which device is playing
+                Console.WriteLine($"Playback state updated - isPlaying: {_isPlaying}");
+                
                 StateHasChanged();
             }
             else
@@ -279,15 +284,28 @@
     }
 
     [JSInvokable]
+    public void OnPlayerReady()
+    {
+        Console.WriteLine("Player ready event received from JavaScript");
+        _isPlayerReady = true;
+        StateHasChanged();
+    }
+    
+    [JSInvokable]
     public void OnPlaybackStateChanged(bool isPlaying, string trackName, string trackArtist, string imageUrl)
     {
         _isPlaying = isPlaying;
         _currentTrackName = string.IsNullOrEmpty(trackName) ? "Not Playing" : trackName;
         _currentTrackArtist = string.IsNullOrEmpty(trackArtist) ? "No Artist" : trackArtist;
         _currentTrackImageUrl = imageUrl;
+        
+        // Since we no longer care about which device is playing,
+        // just update the UI based on whether anything is playing
+        Console.WriteLine($"Playback state changed via JS callback - isPlaying: {isPlaying}");
+        
         StateHasChanged();
     }
-
+    
     private async Task AuthenticateWithSpotify()
     {
         try

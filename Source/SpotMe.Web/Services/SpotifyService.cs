@@ -843,6 +843,20 @@ public class SpotifyService
                     playbackState.IsPlaying = isPlayingProp.GetBoolean();
                     Console.WriteLine($"GetCurrentPlaybackStateAsync: is_playing = {playbackState.IsPlaying}");
                     
+                    // Check if playback is on the current device
+                    if (root.TryGetProperty("device", out var deviceObj))
+                    {
+                        if (deviceObj.TryGetProperty("id", out var deviceIdProp))
+                        {
+                            playbackState.DeviceId = deviceIdProp.GetString();
+                        }
+                        
+                        if (deviceObj.TryGetProperty("name", out var deviceNameProp))
+                        {
+                            playbackState.DeviceName = deviceNameProp.GetString();
+                        }
+                    }
+                    
                     if (root.TryGetProperty("item", out var item))
                     {
                         Console.WriteLine("GetCurrentPlaybackStateAsync: Found 'item' property");
