@@ -2,12 +2,24 @@ using SpotMe.Web.Components;
 using SpotMe.Web.Services;
 using Microsoft.JSInterop;
 using System.Text.Json.Serialization;
+using Blazorise;
+using Blazorise.Bootstrap5;
+using Blazorise.Icons.FontAwesome;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+// Add Blazorise services
+builder.Services
+    .AddBlazorise(options =>
+    {
+        options.Immediate = true;
+    })
+    .AddBootstrap5Providers()
+    .AddFontAwesomeIcons();
 
 // Register HttpClient
 builder.Services.AddHttpClient();
@@ -30,6 +42,9 @@ builder.Services.AddScoped<SpotifyService>(sp =>
         sp.GetRequiredService<IHttpClientFactory>().CreateClient()
     )
 );
+
+// Register Stats service
+builder.Services.AddScoped<StatsService>();
 
 var app = builder.Build();
 
