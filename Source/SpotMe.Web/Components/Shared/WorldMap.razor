@@ -1,0 +1,229 @@
+﻿@using SpotMe.Web.Models
+@using Microsoft.JSInterop
+@inject IJSRuntime JSRuntime
+
+<div class="world-map-container">
+    <div class="world-map-header">
+        <h6 class="map-title">@Title</h6>
+        @if (ShowLegend && CountryData?.Any() == true)
+        {
+            <div class="map-legend">
+                <div class="legend-item">
+                    <span class="legend-color" style="background-color: @MinColor"></span>
+                    <span class="legend-text">@MinValue</span>
+                </div>
+                <div class="legend-gradient"></div>
+                <div class="legend-item">
+                    <span class="legend-color" style="background-color: @MaxColor"></span>
+                    <span class="legend-text">@MaxValue</span>
+                </div>
+            </div>
+        }
+    </div>
+    
+    <div class="map-canvas-container" style="width: 100%; height: @(Height)px; position: relative;">
+        <div @ref="mapContainer" id="@CanvasId" style="width: 100%; height: 100%; border-radius: 6px; overflow: hidden;"></div>
+    </div>
+    
+    @if (CountryData?.Any() == true)
+    {
+        <!-- Country Statistics Table -->
+        <div class="country-table-container">
+            <div class="table-responsive">
+                <table class="table table-dark table-striped align-middle">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Country</th>
+                            <th>Plays</th>
+                            <th>Time</th>
+                            <th>Unique Tracks</th>
+                            <th>Unique Artists</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var country in CountryData.Select((c, i) => new { Country = c, Index = i + 1 }))
+                        {
+                            <tr>
+                                <td>@country.Index</td>
+                                <td>
+                                    <span class="country-indicator" style="background-color: @GetColorForValue(country.Country.PlayCount, MinValue, MaxValue, MaxValue - MinValue)"></span>
+                                    @country.Country.CountryName
+                                </td>
+                                <td>@country.Country.PlayCount.ToString("N0")</td>
+                                <td>@FormatMinutes(country.Country.TotalMinutes)</td>
+                                <td>@country.Country.UniqueTracks.ToString("N0")</td>
+                                <td>@country.Country.UniqueArtists.ToString("N0")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public List<CountryStats>? CountryData { get; set; }
+    [Parameter] public string Title { get; set; } = "Listening by Country";
+    [Parameter] public int Height { get; set; } = 400;
+    [Parameter] public bool ShowLegend { get; set; } = true;
+    [Parameter] public string CssClass { get; set; } = "";
+    
+    private ElementReference mapContainer;
+    private string CanvasId = $"worldmap-{Guid.NewGuid():N}";
+    private bool _isInitialized = false;
+    
+    // Color scheme matching your app theme (updated to match map)
+    private string MinColor = "#1e3a8a"; // Dark blue for low values
+    private string MaxColor = "#1DB954"; // Spotify green for high values
+    private string NoDataColor = "#282828"; // Very dark gray for no data
+    private string BorderColor = "#121212"; // Dark background color
+    
+    private int MinValue => CountryData?.Any() == true ? CountryData.Min(c => c.PlayCount) : 0;
+    private int MaxValue => CountryData?.Any() == true ? CountryData.Max(c => c.PlayCount) : 0;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && CountryData?.Any() == true)
+        {
+            await InitializeMap();
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_isInitialized && CountryData?.Any() == true)
+        {
+            await UpdateMapData();
+        }
+    }
+
+    private async Task InitializeMap()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("initializeWorldMap", CanvasId, PrepareMapData());
+            _isInitialized = true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error initializing world map: {ex.Message}");
+        }
+    }
+
+    private async Task UpdateMapData()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("updateWorldMapData", CanvasId, PrepareMapData());
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error updating world map data: {ex.Message}");
+        }
+    }
+
+    private object PrepareMapData()
+    {
+        if (CountryData?.Any() != true)
+            return new { };
+
+        var maxValue = CountryData.Max(c => c.PlayCount);
+        var minValue = CountryData.Min(c => c.PlayCount);
+        var range = maxValue - minValue;
+
+        var mapData = CountryData.ToDictionary(
+            country => country.CountryCode.ToLower(),
+            country => new
+            {
+                value = country.PlayCount,
+                label = $"{country.CountryName}: {country.PlayCount:N0} plays ({FormatMinutes(country.TotalMinutes)})",
+                color = GetColorForValue(country.PlayCount, minValue, maxValue, range)
+            }
+        );
+
+        return new
+        {
+            data = mapData,
+            options = new
+            {
+                responsive = true,
+                maintainAspectRatio = false,
+                plugins = new
+                {
+                    legend = new { display = false },
+                    tooltip = new
+                    {
+                        enabled = true,
+                        backgroundColor = "#181818",
+                        titleColor = "#ffffff",
+                        bodyColor = "#b3b3b3",
+                        borderColor = "#404040",
+                        borderWidth = 1
+                    }
+                },
+                scales = new
+                {
+                    projection = new
+                    {
+                        axis = "x",
+                        projection = "naturalEarth1"
+                    }
+                },
+                backgroundColor = "#121212",
+                borderColor = BorderColor,
+                borderWidth = 1
+            }
+        };
+    }
+
+    private string GetColorForValue(int value, int min, int max, int range)
+    {
+        if (range == 0) return MaxColor;
+
+        // Use logarithmic scaling to match the map
+        var logValue = Math.Log10(value + 1);
+        var logMin = Math.Log10(min + 1);
+        var logMax = Math.Log10(max + 1);
+        var logRange = logMax - logMin;
+
+        var ratio = logRange > 0 ? (logValue - logMin) / logRange : 0.5;
+
+        // Interpolate between MinColor and MaxColor
+        var minRgb = HexToRgb(MinColor);
+        var maxRgb = HexToRgb(MaxColor);
+
+        var r = (int)(minRgb.r + (maxRgb.r - minRgb.r) * ratio);
+        var g = (int)(minRgb.g + (maxRgb.g - minRgb.g) * ratio);
+        var b = (int)(minRgb.b + (maxRgb.b - minRgb.b) * ratio);
+
+        return $"rgb({r}, {g}, {b})";
+    }
+
+    private (int r, int g, int b) HexToRgb(string hex)
+    {
+        hex = hex.TrimStart('#');
+        return (
+            Convert.ToInt32(hex.Substring(0, 2), 16),
+            Convert.ToInt32(hex.Substring(2, 2), 16),
+            Convert.ToInt32(hex.Substring(4, 2), 16)
+        );
+    }
+
+    private string FormatMinutes(double minutes)
+    {
+        if (minutes < 60)
+            return $"{minutes:F0}m";
+        
+        var hours = (int)(minutes / 60);
+        var remainingMinutes = (int)(minutes % 60);
+        
+        if (hours < 24)
+            return $"{hours}h {remainingMinutes}m";
+        
+        var days = hours / 24;
+        var remainingHours = hours % 24;
+        return $"{days}d {remainingHours}h";
+    }
+}

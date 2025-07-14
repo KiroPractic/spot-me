@@ -174,6 +174,9 @@ public class StatsService
         // Calculate music-specific statistics
         var musicStats = CalculateMusicStats(filteredEntries, actualStartDate, actualEndDate);
 
+        // Calculate country-specific statistics
+        var countryStats = CalculateCountryStats(filteredEntries);
+
         return new StatsOverview
         {
             StartDate = actualStartDate,
@@ -190,7 +193,8 @@ public class StatsService
             TopTracks = trackStats,
             TopAlbums = albumStats,
             TopPodcasts = podcastStats,
-            MusicStats = musicStats
+            MusicStats = musicStats,
+            CountryStats = countryStats
         };
     }
     
@@ -465,5 +469,124 @@ public class StatsService
             .ToList();
 
         return skippedArtists;
+    }
+
+    private List<CountryStats> CalculateCountryStats(List<StreamingHistoryEntry> entries)
+    {
+        // Country code mapping for common countries
+        var countryMapping = new Dictionary<string, string>
+        {
+            { "US", "United States" },
+            { "GB", "United Kingdom" },
+            { "CA", "Canada" },
+            { "AU", "Australia" },
+            { "DE", "Germany" },
+            { "FR", "France" },
+            { "IT", "Italy" },
+            { "ES", "Spain" },
+            { "NL", "Netherlands" },
+            { "SE", "Sweden" },
+            { "NO", "Norway" },
+            { "DK", "Denmark" },
+            { "FI", "Finland" },
+            { "PL", "Poland" },
+            { "CZ", "Czech Republic" },
+            { "AT", "Austria" },
+            { "CH", "Switzerland" },
+            { "BE", "Belgium" },
+            { "IE", "Ireland" },
+            { "PT", "Portugal" },
+            { "GR", "Greece" },
+            { "HR", "Croatia" },
+            { "HU", "Hungary" },
+            { "RO", "Romania" },
+            { "BG", "Bulgaria" },
+            { "SK", "Slovakia" },
+            { "SI", "Slovenia" },
+            { "LT", "Lithuania" },
+            { "LV", "Latvia" },
+            { "EE", "Estonia" },
+            { "JP", "Japan" },
+            { "KR", "South Korea" },
+            { "CN", "China" },
+            { "IN", "India" },
+            { "BR", "Brazil" },
+            { "MX", "Mexico" },
+            { "AR", "Argentina" },
+            { "CL", "Chile" },
+            { "CO", "Colombia" },
+            { "PE", "Peru" },
+            { "ZA", "South Africa" },
+            { "EG", "Egypt" },
+            { "NG", "Nigeria" },
+            { "KE", "Kenya" },
+            { "MA", "Morocco" },
+            { "TN", "Tunisia" },
+            { "DZ", "Algeria" },
+            { "RU", "Russia" },
+            { "UA", "Ukraine" },
+            { "BY", "Belarus" },
+            { "TR", "Turkey" },
+            { "IL", "Israel" },
+            { "SA", "Saudi Arabia" },
+            { "AE", "United Arab Emirates" },
+            { "QA", "Qatar" },
+            { "KW", "Kuwait" },
+            { "BH", "Bahrain" },
+            { "OM", "Oman" },
+            { "JO", "Jordan" },
+            { "LB", "Lebanon" },
+            { "SY", "Syria" },
+            { "IQ", "Iraq" },
+            { "IR", "Iran" },
+            { "AF", "Afghanistan" },
+            { "PK", "Pakistan" },
+            { "BD", "Bangladesh" },
+            { "LK", "Sri Lanka" },
+            { "NP", "Nepal" },
+            { "BT", "Bhutan" },
+            { "MV", "Maldives" },
+            { "TH", "Thailand" },
+            { "VN", "Vietnam" },
+            { "LA", "Laos" },
+            { "KH", "Cambodia" },
+            { "MM", "Myanmar" },
+            { "MY", "Malaysia" },
+            { "SG", "Singapore" },
+            { "ID", "Indonesia" },
+            { "PH", "Philippines" },
+            { "BN", "Brunei" },
+            { "TL", "East Timor" },
+            { "NZ", "New Zealand" },
+            { "FJ", "Fiji" },
+            { "PG", "Papua New Guinea" },
+            { "SB", "Solomon Islands" },
+            { "VU", "Vanuatu" },
+            { "NC", "New Caledonia" },
+            { "PF", "French Polynesia" },
+            { "WS", "Samoa" },
+            { "TO", "Tonga" },
+            { "KI", "Kiribati" },
+            { "TV", "Tuvalu" },
+            { "NR", "Nauru" },
+            { "PW", "Palau" },
+            { "FM", "Micronesia" },
+            { "MH", "Marshall Islands" }
+        };
+
+        return entries
+            .Where(e => !string.IsNullOrEmpty(e.PlayedInCountryCode))
+            .GroupBy(e => e.PlayedInCountryCode)
+            .Select(g => new CountryStats
+            {
+                CountryCode = g.Key,
+                CountryName = countryMapping.GetValueOrDefault(g.Key, g.Key),
+                PlayCount = g.Count(),
+                TotalMinutes = g.Sum(e => e.MinutesPlayed),
+                UniqueTracks = g.Select(e => new { e.UnifiedArtistName, e.UnifiedTrackName }).Distinct().Count(),
+                UniqueArtists = g.Select(e => e.UnifiedArtistName).Where(a => !string.IsNullOrEmpty(a)).Distinct().Count()
+            })
+            .OrderByDescending(c => c.PlayCount)
+            .ToList();
     }
 }

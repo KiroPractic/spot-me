@@ -168,6 +168,9 @@ public class StatsOverview
     
     // Music-specific statistics
     public MusicStats MusicStats { get; set; } = new();
+
+    // Country-specific statistics
+    public List<CountryStats> CountryStats { get; set; } = new();
 }
 
 public class ContentTypeBreakdown
@@ -257,4 +260,14 @@ public class MusicStats
     public List<TrackStats> TopSkippedMusicTracks { get; set; } = new();
     public List<ArtistStats> TopSkippedMusicArtists { get; set; } = new();
     public PlaybackBehavior MusicPlaybackBehavior { get; set; } = new();
+}
+
+public class CountryStats
+{
+    public string CountryCode { get; set; } = string.Empty;
+    public string CountryName { get; set; } = string.Empty;
+    public int PlayCount { get; set; }
+    public double TotalMinutes { get; set; }
+    public int UniqueTracks { get; set; }
+    public int UniqueArtists { get; set; }
 }

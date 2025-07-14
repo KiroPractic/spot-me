@@ -1,7 +1,9 @@
 @page "/stats"
 @using SpotMe.Web.Models
+@using SpotMe.Web.Components.Shared
 @using Microsoft.AspNetCore.Components
 @using Microsoft.AspNetCore.Components.Forms
+@using Blazorise.Charts
 @inject Services.StatsService StatsService
 @inject IJSRuntime JsRuntime
 @rendermode InteractiveServer
@@ -140,6 +142,19 @@
                             <p class="card-text h4">@_stats.PlaybackBehavior.IncognitoPlays</p>
                         </div>
                     </div>
+                </div>
+            </div>
+        }
+
+        <!-- World Map Section -->
+        @if (_stats?.CountryStats?.Any() == true)
+        {
+            <div class="row g-4 mb-4">
+                <div class="col-12">
+                    <WorldMap CountryData="@_stats.CountryStats"
+                              Title="Listening Activity by Country"
+                              Height="450"
+                              ShowLegend="true" />
                 </div>
             </div>
         }
@@ -329,7 +344,7 @@
                                                 <th>#</th>
                                                 <th>Artist</th>
                                                 <th>Track</th>
-                                                <th>Skip Count</th>
+                                                <th>Skips</th>
                                             </tr>
                                             </thead>
                                             <tbody>
@@ -359,7 +374,7 @@
                                             <tr>
                                                 <th>#</th>
                                                 <th>Artist</th>
-                                                <th>Skip Count</th>
+                                                <th>Skips</th>
                                                 <th>Unique Tracks</th>
                                             </tr>
                                             </thead>
