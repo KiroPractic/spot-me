@@ -18,10 +18,43 @@ A .NET 8 application with Blazor frontend and Entity Framework Core backend usin
 
 1. Clone the repository
 2. Make sure Docker is installed
-3. Start the development environment:
+3. Configure the Blazorise license key (see Configuration section below)
+4. Start the development environment:
    ```
    docker compose up -d
    ```
+
+## Configuration
+
+### Blazorise License Key
+
+This application uses Blazorise components which require a license key. The license key should **never** be committed to version control.
+
+#### For Development (Recommended)
+
+Use .NET User Secrets to store the license key securely:
+
+```bash
+cd Source/SpotMe.Web
+dotnet user-secrets set "Blazorise:ProductToken" "YOUR_LICENSE_KEY_HERE"
+```
+
+#### For Production
+
+Set the license key as an environment variable:
+
+```bash
+# Linux/macOS
+export Blazorise__ProductToken="YOUR_LICENSE_KEY_HERE"
+
+# Windows PowerShell
+$env:Blazorise__ProductToken="YOUR_LICENSE_KEY_HERE"
+
+# Windows Command Prompt
+set Blazorise__ProductToken=YOUR_LICENSE_KEY_HERE
+```
+
+Or add it to your deployment configuration (Azure App Service, Docker, etc.) as an environment variable.
 
 ### Development Tools
 

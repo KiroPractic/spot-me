@@ -150,22 +150,25 @@
         @if (_stats?.TimeBasedStats != null)
         {
             <div class="row g-4 mb-4">
-                <div class="col-md-6">
-                    <div class="card stat-card">
-                        <div class="card-body">
-                            <h6 class="card-title text-center">Listening Hours by Hour of Day</h6>
-                            <div style="width: 100%; height: 350px; padding: 1rem;">
-                                <LineChart @ref="_hourOfDayChart" TItem="double" Options="@_lineChartOptions" />
+                @if (_stats?.TimeBasedStats?.MonthlyStats?.Any() == true)
+                {
+                    <div class="col-md-6">
+                        <div class="card stat-card">
+                            <div class="card-body">
+                                <h6 class="card-title text-center">Average Listening Hours by Month</h6>
+                                <div style="width: 100%; height: 350px; padding: 1rem;">
+                                    <LineChart @ref="_monthlyChart" TItem="double" Options="@_lineChartOptions"/>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
+                }
                 <div class="col-md-6">
                     <div class="card stat-card">
                         <div class="card-body">
                             <h6 class="card-title text-center">Listening Hours by Day of Week</h6>
                             <div style="width: 100%; height: 350px; padding: 1rem;">
-                                <LineChart @ref="_dayOfWeekChart" TItem="double" Options="@_lineChartOptions" />
+                                <LineChart @ref="_dayOfWeekChart" TItem="double" Options="@_lineChartOptions"/>
                             </div>
                         </div>
                     </div>
@@ -175,19 +178,19 @@
 
         <!-- Second Row: Monthly Chart and Pie Chart -->
         <div class="row g-4 mb-4">
-            @if (_stats?.TimeBasedStats?.MonthlyStats?.Any() == true)
-            {
-                <div class="col-md-6">
-                    <div class="card stat-card">
-                        <div class="card-body">
-                            <h6 class="card-title text-center">Average Listening Hours by Month</h6>
-                            <div style="width: 100%; height: 350px; padding: 1rem;">
-                                <LineChart @ref="_monthlyChart" TItem="double" Options="@_lineChartOptions" />
-                            </div>
+            <div class="col-md-6">
+                <div class="card stat-card">
+                    <div class="card-body">
+                        <h6 class="card-title text-center">
+                            Listening Hours by Hour of Day
+                            <span class="text-center text-muted mb-2" style="font-size: 0.8rem;">UTC</span>
+                        </h6>
+                        <div style="width: 100%; height: 350px; padding: 1rem;">
+                            <LineChart @ref="_hourOfDayChart" TItem="double" Options="@_lineChartOptions"/>
                         </div>
                     </div>
                 </div>
-            }
+            </div>
             <div class="col-md-6">
                 <div class="card stat-card">
                     <div class="card-body">

@@ -27,6 +27,16 @@ builder.Services.AddHttpClient();
 // Add CORS services
 builder.Services.AddCors();
 
+// Configure Blazorise with license key from configuration
+builder.Services.AddBlazorise(options =>
+{
+    var blazoriseToken = builder.Configuration["Blazorise:ProductToken"];
+    if (!string.IsNullOrEmpty(blazoriseToken))
+    {
+        options.ProductToken = blazoriseToken;
+    }
+});
+
 // Configure JSON serialization
 builder.Services.AddControllers()
     .AddJsonOptions(options => 
