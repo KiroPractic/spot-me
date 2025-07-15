@@ -1,5 +1,6 @@
 using SpotMe.Web.Models;
 using System.Text.Json;
+using System.Globalization;
 
 namespace SpotMe.Web.Services;
 
@@ -177,6 +178,9 @@ public class StatsService
         // Calculate country-specific statistics
         var countryStats = CalculateCountryStats(filteredEntries);
 
+        // Calculate time-based statistics
+        var timeBasedStats = CalculateTimeBasedStats(filteredEntries, actualStartDate, actualEndDate);
+
         return new StatsOverview
         {
             StartDate = actualStartDate,
@@ -194,7 +198,8 @@ public class StatsService
             TopAlbums = albumStats,
             TopPodcasts = podcastStats,
             MusicStats = musicStats,
-            CountryStats = countryStats
+            CountryStats = countryStats,
+            TimeBasedStats = timeBasedStats
         };
     }
     
@@ -588,5 +593,138 @@ public class StatsService
             })
             .OrderByDescending(c => c.PlayCount)
             .ToList();
+    }
+
+    private TimeBasedStats CalculateTimeBasedStats(List<StreamingHistoryEntry> entries, DateTime startDate, DateTime endDate)
+    {
+        var timeBasedStats = new TimeBasedStats();
+
+        // Calculate day of week statistics
+        var daysInRange = (endDate - startDate).Days + 1;
+        var dayOfWeekOccurrences = new Dictionary<DayOfWeek, int>();
+        
+        // Count how many times each day of week occurs in the date range
+        for (var date = startDate.Date; date <= endDate.Date; date = date.AddDays(1))
+        {
+            var dayOfWeek = date.DayOfWeek;
+            dayOfWeekOccurrences[dayOfWeek] = dayOfWeekOccurrences.GetValueOrDefault(dayOfWeek, 0) + 1;
+        }
+
+        timeBasedStats.DayOfWeekStats = Enum.GetValues<DayOfWeek>()
+            .Select(dayOfWeek =>
+            {
+                var dayEntries = entries.Where(e => e.StartDateTime.DayOfWeek == dayOfWeek).ToList();
+                var totalMinutes = dayEntries.Sum(e => e.MinutesPlayed);
+                var playCount = dayEntries.Count;
+                var occurrences = dayOfWeekOccurrences.GetValueOrDefault(dayOfWeek, 1);
+                
+                return new DayOfWeekStats
+                {
+                    DayOfWeek = dayOfWeek,
+                    DayName = dayOfWeek.ToString(),
+                    PlayCount = playCount,
+                    TotalMinutes = totalMinutes,
+                    AverageMinutesPerOccurrence = occurrences > 0 ? totalMinutes / occurrences : 0
+                };
+            })
+            .ToList();
+
+        // Calculate hour of day statistics  
+        timeBasedStats.HourOfDayStats = Enumerable.Range(0, 24)
+            .Select(hour =>
+            {
+                var hourEntries = entries.Where(e => e.StartDateTime.Hour == hour).ToList();
+                var totalMinutes = hourEntries.Sum(e => e.MinutesPlayed);
+                var playCount = hourEntries.Count;
+                
+                return new HourOfDayStats
+                {
+                    Hour = hour,
+                    HourLabel = $"{hour:00}:00",
+                    PlayCount = playCount,
+                    TotalMinutes = totalMinutes,
+                    AverageMinutesPerOccurrence = daysInRange > 0 ? totalMinutes / daysInRange : 0
+                };
+            })
+            .ToList();
+
+        // Calculate monthly statistics
+        var totalRangeInDays = (endDate - startDate).Days + 1;
+        var isMoreThanOneYear = totalRangeInDays > 365;
+        
+        timeBasedStats.MonthlyStats = new List<MonthlyStats>();
+
+        if (isMoreThanOneYear)
+        {
+            // If range covers more than a year, show all 12 months normalized by occurrence count
+            for (int month = 1; month <= 12; month++)
+            {
+                var monthEntries = entries.Where(e => e.StartDateTime.Month == month).ToList();
+                var totalMinutes = monthEntries.Sum(e => e.MinutesPlayed);
+                var playCount = monthEntries.Count;
+                
+                // Count how many times this month actually occurs in the data (not just date range)
+                var monthOccurrences = entries
+                    .Select(e => new { e.StartDateTime.Year, e.StartDateTime.Month })
+                    .Where(ym => ym.Month == month)
+                    .Select(ym => ym.Year)
+                    .Distinct()
+                    .Count();
+                
+                // Use average minutes per month occurrence to normalize for uneven sampling
+                var averageMinutesPerMonthOccurrence = monthOccurrences > 0 ? totalMinutes / monthOccurrences : 0;
+                
+                timeBasedStats.MonthlyStats.Add(new MonthlyStats
+                {
+                    Month = month,
+                    Year = 0, // Represents aggregated across years
+                    MonthName = new DateTime(2000, month, 1).ToString("MMMM", CultureInfo.InvariantCulture),
+                    MonthYearLabel = new DateTime(2000, month, 1).ToString("MMM", CultureInfo.InvariantCulture),
+                    PlayCount = playCount,
+                    TotalMinutes = averageMinutesPerMonthOccurrence, // Now represents average per occurrence
+                    AverageMinutesPerDay = monthOccurrences > 0 ? averageMinutesPerMonthOccurrence / 30.44 : 0 // Rough average days per month
+                });
+            }
+        }
+        else
+        {
+            // If range is within a year, show only months that have data or are in range
+            var monthsInRange = entries
+                .Select(e => new { e.StartDateTime.Year, e.StartDateTime.Month })
+                .Distinct()
+                .OrderBy(m => m.Year)
+                .ThenBy(m => m.Month)
+                .ToList();
+
+            foreach (var monthYear in monthsInRange)
+            {
+                var monthEntries = entries.Where(e => e.StartDateTime.Year == monthYear.Year && e.StartDateTime.Month == monthYear.Month).ToList();
+                var totalMinutes = monthEntries.Sum(e => e.MinutesPlayed);
+                var playCount = monthEntries.Count;
+                
+                // Count days in this specific month and year
+                var daysInMonth = DateTime.DaysInMonth(monthYear.Year, monthYear.Month);
+                var monthStart = new DateTime(monthYear.Year, monthYear.Month, 1);
+                var monthEnd = monthStart.AddMonths(1).AddDays(-1);
+                
+                // Adjust for the actual range boundaries
+                var rangeStart = monthStart < startDate ? startDate : monthStart;
+                var rangeEnd = monthEnd > endDate ? endDate : monthEnd;
+                var actualDaysInRange = (rangeEnd - rangeStart).Days + 1;
+                
+                timeBasedStats.MonthlyStats.Add(new MonthlyStats
+                {
+                    Month = monthYear.Month,
+                    Year = monthYear.Year,
+                    MonthName = new DateTime(monthYear.Year, monthYear.Month, 1).ToString("MMMM", CultureInfo.InvariantCulture),
+                    MonthYearLabel = new DateTime(monthYear.Year, monthYear.Month, 1).ToString("MMM yyyy", CultureInfo.InvariantCulture),
+                    PlayCount = playCount,
+                    TotalMinutes = totalMinutes,
+                    AverageMinutesPerDay = actualDaysInRange > 0 ? totalMinutes / actualDaysInRange : 0
+                });
+            }
+        }
+
+        return timeBasedStats;
     }
 }

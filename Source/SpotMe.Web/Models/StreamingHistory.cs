@@ -169,8 +169,11 @@ public class StatsOverview
     // Music-specific statistics
     public MusicStats MusicStats { get; set; } = new();
 
-    // Country-specific statistics
+        // Country-specific statistics
     public List<CountryStats> CountryStats { get; set; } = new();
+
+    // Time-based statistics
+    public TimeBasedStats TimeBasedStats { get; set; } = new();
 }
 
 public class ContentTypeBreakdown
@@ -270,4 +273,41 @@ public class CountryStats
     public double TotalMinutes { get; set; }
     public int UniqueTracks { get; set; }
     public int UniqueArtists { get; set; }
+}
+
+// Time-based statistics models
+public class DayOfWeekStats
+{
+    public DayOfWeek DayOfWeek { get; set; }
+    public string DayName { get; set; } = string.Empty;
+    public int PlayCount { get; set; }
+    public double TotalMinutes { get; set; }
+    public double AverageMinutesPerOccurrence { get; set; }
+}
+
+public class HourOfDayStats
+{
+    public int Hour { get; set; }
+    public string HourLabel { get; set; } = string.Empty;
+    public int PlayCount { get; set; }
+    public double TotalMinutes { get; set; }
+    public double AverageMinutesPerOccurrence { get; set; }
+}
+
+public class MonthlyStats
+{
+    public int Month { get; set; }
+    public int Year { get; set; }
+    public string MonthName { get; set; } = string.Empty;
+    public string MonthYearLabel { get; set; } = string.Empty;
+    public int PlayCount { get; set; }
+    public double TotalMinutes { get; set; }
+    public double AverageMinutesPerDay { get; set; }
+}
+
+public class TimeBasedStats
+{
+    public List<DayOfWeekStats> DayOfWeekStats { get; set; } = new();
+    public List<HourOfDayStats> HourOfDayStats { get; set; } = new();
+    public List<MonthlyStats> MonthlyStats { get; set; } = new();
 }
