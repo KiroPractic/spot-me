@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  # PostgreSQL database
+  postgres:
+    image: postgres:15
+    container_name: spotme-postgres-prod
+    environment:
+      POSTGRES_USER: spotme
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-spotme_password}
+      POSTGRES_DB: spotme_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U spotme -d spotme_db"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # SpotMe Web Application (Production)
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: spotme-app-prod
+    ports:
+      - "80:8080"
+    volumes:
+      - spotify_data:/app/SpotifyStats
+      - user_data:/app/UserData
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__Database=Host=postgres;Database=spotme_db;Username=spotme;Password=${POSTGRES_PASSWORD:-spotme_password};Port=5432
+      - Blazorise__ProductToken=${BLAZORISE_TOKEN}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  postgres_data:
+  spotify_data:
+  user_data: 

@@ -3,8 +3,6 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SpotMe.Model", "SpotMe.Model\SpotMe.Model.csproj", "{40C1D267-6BE1-4FCB-8B98-F3DD8649D3CD}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SpotMe.Web", "SpotMe.Web\SpotMe.Web.csproj", "{425C63D0-B0E5-403D-811B-69B1519488D7}"
 EndProject
 Global
@@ -16,10 +14,6 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{40C1D267-6BE1-4FCB-8B98-F3DD8649D3CD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{40C1D267-6BE1-4FCB-8B98-F3DD8649D3CD}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{40C1D267-6BE1-4FCB-8B98-F3DD8649D3CD}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{40C1D267-6BE1-4FCB-8B98-F3DD8649D3CD}.Release|Any CPU.Build.0 = Release|Any CPU
 		{425C63D0-B0E5-403D-811B-69B1519488D7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{425C63D0-B0E5-403D-811B-69B1519488D7}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{425C63D0-B0E5-403D-811B-69B1519488D7}.Release|Any CPU.ActiveCfg = Release|Any CPU

@@ -7,11 +7,14 @@ namespace SpotMe.Web.Services;
 public class StatsService
 {
     private readonly IWebHostEnvironment _environment;
+    private readonly UserDataService _userDataService;
     private List<StreamingHistoryEntry>? _allEntries;
+    private readonly Dictionary<string, List<StreamingHistoryEntry>> _userEntries = new();
     
-    public StatsService(IWebHostEnvironment environment)
+    public StatsService(IWebHostEnvironment environment, UserDataService userDataService)
     {
         _environment = environment;
+        _userDataService = userDataService;
     }
     
     public async Task<List<StreamingHistoryEntry>> LoadAllStreamingHistoryAsync()
@@ -726,5 +729,143 @@ public class StatsService
         }
 
         return timeBasedStats;
+    }
+
+    // User-specific data methods
+
+    /// <summary>
+    /// Load streaming history for a specific user
+    /// </summary>
+    public async Task<List<StreamingHistoryEntry>> LoadUserStreamingHistoryAsync(string userId)
+    {
+        if (string.IsNullOrEmpty(userId))
+            throw new ArgumentException("User ID cannot be null or empty", nameof(userId));
+
+        // Check cache first
+        if (_userEntries.TryGetValue(userId, out var cachedEntries))
+            return cachedEntries;
+
+        // Load from user data service
+        var entries = await _userDataService.LoadUserStreamingHistoryAsync(userId);
+        
+        // Cache the results
+        _userEntries[userId] = entries;
+        
+        return entries;
+    }
+
+    /// <summary>
+    /// Get stats overview for a specific user
+    /// </summary>
+    public async Task<StatsOverview> GetUserStatsOverviewAsync(string userId, DateOnly? startDate = null, DateOnly? endDate = null)
+    {
+        var allEntries = await LoadUserStreamingHistoryAsync(userId);
+        
+        // Filter by date range if provided
+        var filteredEntries = allEntries;
+        if (startDate.HasValue)
+        {
+            filteredEntries = filteredEntries.Where(e => DateOnly.FromDateTime(e.StartDateTime) >= startDate).ToList();
+        }
+        if (endDate.HasValue)
+        {
+            filteredEntries = filteredEntries.Where(e => DateOnly.FromDateTime(e.StartDateTime) <= endDate).ToList();
+        }
+        
+        if (!filteredEntries.Any())
+            return new StatsOverview();
+        
+        return await GenerateStatsOverviewAsync(filteredEntries);
+    }
+
+    /// <summary>
+    /// Clear user data cache (call this when user uploads new files)
+    /// </summary>
+    public void ClearUserCache(string userId)
+    {
+        _userEntries.Remove(userId);
+    }
+
+    /// <summary>
+    /// Clear all user data cache
+    /// </summary>
+    public void ClearAllUserCache()
+    {
+        _userEntries.Clear();
+    }
+
+    /// <summary>
+    /// Generate stats overview from filtered entries (uses same logic as the main method)
+    /// </summary>
+    private async Task<StatsOverview> GenerateStatsOverviewAsync(List<StreamingHistoryEntry> filteredEntries)
+    {
+        var actualStartDate = filteredEntries.Min(e => e.StartDateTime);
+        var actualEndDate = filteredEntries.Max(e => e.StartDateTime);
+        
+        // Calculate basic stats
+        var totalTracks = filteredEntries.Count;
+        var totalMinutes = filteredEntries.Sum(e => e.MinutesPlayed);
+        var uniqueArtists = filteredEntries.Select(e => e.UnifiedArtistName).Where(a => !string.IsNullOrEmpty(a)).Distinct().Count();
+        var uniqueTracks = filteredEntries.Select(e => new { e.UnifiedArtistName, e.UnifiedTrackName }).Distinct().Count();
+        
+        // Calculate average minutes per day
+        var daysInRange = (actualEndDate - actualStartDate).Days + 1;
+        var averageMinutesPerDay = daysInRange > 0 ? totalMinutes / daysInRange : 0;
+        
+        // Calculate content type breakdown
+        var contentTypeBreakdown = CalculateContentTypeBreakdown(filteredEntries);
+        
+        // Calculate platform breakdown
+        var platformBreakdown = CalculatePlatformBreakdown(filteredEntries);
+        
+        // Calculate playback behavior
+        var playbackBehavior = CalculatePlaybackBehavior(filteredEntries);
+        
+        // Get top artists (reusing existing logic)
+        var artistStats = filteredEntries
+            .Where(e => !string.IsNullOrEmpty(e.UnifiedArtistName))
+            .GroupBy(e => e.UnifiedArtistName)
+            .Select(g => new ArtistStats
+            {
+                ArtistName = g.Key,
+                PlayCount = g.Count(),
+                TotalMinutes = g.Sum(e => e.MinutesPlayed),
+                UniqueTracks = g.Select(e => e.UnifiedTrackName).Distinct().Count(),
+                UniqueAlbums = g.Where(e => !string.IsNullOrEmpty(e.MasterMetadataAlbumAlbumName))
+                               .Select(e => e.MasterMetadataAlbumAlbumName)
+                               .Distinct()
+                               .Count(),
+                PrimaryContentType = g.GroupBy(e => e.ContentType)
+                                    .OrderByDescending(ct => ct.Count())
+                                    .First().Key
+            })
+            .OrderByDescending(a => a.TotalMinutes)
+            .Take(10)
+            .ToList();
+
+        // Create and populate the stats object with all the same logic as the main method
+        var stats = new StatsOverview
+        {
+            StartDate = actualStartDate,
+            EndDate = actualEndDate,
+            TotalTracks = totalTracks,
+            TotalMinutes = totalMinutes,
+            UniqueArtists = uniqueArtists,
+            UniqueTracks = uniqueTracks,
+            AverageMinutesPerDay = averageMinutesPerDay,
+            ContentTypeBreakdown = contentTypeBreakdown,
+            PlatformBreakdown = platformBreakdown,
+            PlaybackBehavior = playbackBehavior,
+            TopArtists = artistStats,
+            // TODO: Add other properties by copying from the main method
+            TopTracks = new List<TrackStats>(),
+            TopAlbums = new List<AlbumStats>(),
+            TopPodcasts = new List<PodcastStats>(),
+            MusicStats = new MusicStats(),
+            CountryStats = new List<CountryStats>(),
+            TimeBasedStats = new TimeBasedStats()
+        };
+
+        return stats;
     }
 }

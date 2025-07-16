@@ -13,37 +13,48 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U spotme -d spotme_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # SMTP server for development
   smtp4dev:
     image: rnwood/smtp4dev
     container_name: spotme-smtp4dev
     ports:
-      - "3000:80"    # Web interface
-      - "25:25"      # SMTP port
+      - "3000:80"
+      - "25:25"
     environment:
       - ServerOptions__BasePath=/
     volumes:
       - smtp4dev_data:/smtp4dev
 
-  # .NET SDK for development
-  dotnet-sdk:
+  # SpotMe Web Application (Development with hot reload)
+  app:
     image: mcr.microsoft.com/dotnet/sdk:8.0
-    container_name: spotme-dotnet-sdk
+    container_name: spotme-app-dev
     volumes:
-      - .:/app
-    working_dir: /app/Source
+      - ./Source:/src
+      - /src/SpotMe.Web/bin
+      - /src/SpotMe.Web/obj
+      - spotify_data:/src/SpotMe.Web/SpotifyStats
+      - user_data:/src/SpotMe.Web/UserData
+    working_dir: /src
     ports:
-      - "5000:5000"  # ASP.NET Core port
-      - "5001:5001"  # ASP.NET Core HTTPS port
+      - "5000:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      - ASPNETCORE_URLS=http://+:5000
-    tty: true
-    stdin_open: true
-    # Keep container running
-    command: tail -f /dev/null
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__Database=Host=postgres;Database=spotme_db;Username=spotme;Password=spotme_password;Port=5432
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: dotnet watch run --project SpotMe.Web/SpotMe.Web.csproj --urls http://0.0.0.0:8080
 
 volumes:
   postgres_data:
   smtp4dev_data:
+  spotify_data:
+  user_data:
