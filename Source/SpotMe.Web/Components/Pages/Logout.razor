@@ -1,5 +1,7 @@
 @page "/logout"
-@inject IJSRuntime JsRuntime
+@using SpotMe.Web.Services
+@inject UserAuthenticationService AuthService
+@inject NavigationManager Navigation
 @rendermode InteractiveServer
 
 <div class="logout-page">
@@ -17,7 +19,10 @@
     {
         if (firstRender)
         {
-            await JsRuntime.InvokeVoidAsync("logoutUser");
+            await AuthService.SignOutUserAsync();
+            
+            await Task.Delay(1000); // Brief delay to show logout message
+            Navigation.NavigateTo("/", forceLoad: true);
         }
     }
 }

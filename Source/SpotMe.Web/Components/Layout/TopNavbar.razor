@@ -1,10 +1,11 @@
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
 @using SpotMe.Web.Services
-@using SpotMe.Web.Models
-@using SpotMe.Web.Components
 @implements IDisposable
 @inject IJSRuntime JsRuntime
-@inject SpotifyService SpotifyService
 @inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject UserAuthenticationService AuthService
 @rendermode InteractiveServer
 
 <div class="top-navbar">
@@ -18,68 +19,258 @@
             <i class="bi bi-house-door"></i>
             <span>Home</span>
         </a>
-        <a href="/about" class="@GetActiveClass("/about")">
-            <i class="bi bi-info-circle"></i>
-            <span>About</span>
-        </a>
+        
         @if (_isAuthenticated)
         {
-            <a href="/playlists" class="@GetActiveClass("/playlists")">
-                <i class="bi bi-music-note-list"></i>
-                <span>Playlists</span>
+            <a href="/instructions" class="@GetActiveClass("/instructions")">
+                <i class="bi bi-info-circle"></i>
+                <span>Instructions</span>
             </a>
-            <a href="/record-player" class="@GetActiveClass("/record-player")">
-                <i class="bi bi-music-note"></i>
-                <span>Record Player</span>
+            <a href="/userdata" class="@GetActiveClass("/userdata")">
+                <i class="bi bi-file-earmark-arrow-up"></i>
+                <span>Upload Data</span>
             </a>
             <a href="/stats" class="@GetActiveClass("/stats")">
                 <i class="bi bi-graph-up"></i>
                 <span>Stats</span>
             </a>
-            <a href="/userdata" class="@GetActiveClass("/userdata")">
-                <i class="bi bi-file-earmark-arrow-up"></i>
-                <span>My Data</span>
+            <a href="/playlists" class="@GetActiveClass("/playlists")">
+                <i class="bi bi-music-note-list"></i>
+                <span>Playlists</span>
             </a>
         }
-    </div>
-    
-    <div class="player-section">
-        <SpotifyPlayer />
+        else
+        {
+            <a href="/about" class="@GetActiveClass("/about")">
+                <i class="bi bi-info-circle"></i>
+                <span>About</span>
+            </a>
+        }
     </div>
     
     <div class="user-section">
         @if (_isAuthenticated)
         {
             <div class="user-profile">
-                @if (!string.IsNullOrEmpty(_userProfile?.ImageUrl))
-                {
-                    <img src="@_userProfile.ImageUrl" alt="@(_userProfile.DisplayName ?? "User")" class="profile-img" />
-                }
-                else
-                {
-                    <i class="bi bi-person-circle profile-icon"></i>
-                }
+                <i class="bi bi-person-circle profile-icon"></i>
                 <span class="username">@GetCurrentUsername()</span>
             </div>
             
-            <a href="/logout" class="logout-btn">
+            <button @onclick="LogoutAsync" class="logout-btn">
                 <i class="bi bi-box-arrow-right"></i>
                 <span>Logout</span>
-            </a>
+            </button>
         }
         else
         {
-            <button @onclick="AuthenticateWithSpotify" class="spotify-button">
-                <i class="bi bi-spotify"></i>
-                <span>Sign in with Spotify</span>
-            </button>
+            <div class="auth-buttons">
+                <a href="/login" class="btn btn-outline-primary btn-sm me-2">
+                    <i class="bi bi-box-arrow-in-right me-1"></i>
+                    Sign In
+                </a>
+                <a href="/register" class="btn btn-primary btn-sm">
+                    <i class="bi bi-person-plus me-1"></i>
+                    Register
+                </a>
+            </div>
         }
     </div>
 </div>
 
+<style>
+    .top-navbar {
+        background-color: #121212;
+        border-bottom: 1px solid #282828;
+        color: #ffffff;
+        padding: 0.75rem 1.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        position: sticky;
+        top: 0;
+        z-index: 1000;
+    }
+
+    .navbar-brand {
+        display: flex;
+        align-items: center;
+        font-weight: bold;
+        font-size: 1.25rem;
+        text-decoration: none;
+        color: #ffffff;
+    }
+
+    .spotify-icon {
+        font-size: 1.5rem;
+        margin-right: 0.5rem;
+        color: #1db954;
+    }
+
+    .nav-links {
+        display: flex;
+        gap: 1.5rem;
+        align-items: center;
+    }
+
+    .nav-links a {
+        color: #b3b3b3;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        transition: all 0.2s ease;
+        font-weight: 500;
+    }
+
+    .nav-links a:hover {
+        color: #ffffff;
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    .nav-links a.active {
+        color: #ffffff;
+        background: rgba(29, 185, 84, 0.2);
+    }
+
+    .nav-links a i {
+        margin-right: 0.5rem;
+        font-size: 1.1rem;
+    }
+
+    .user-section {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .user-profile {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: #ffffff;
+    }
+
+    .profile-icon {
+        font-size: 1.5rem;
+        color: #b3b3b3;
+    }
+
+    .username {
+        font-weight: 500;
+        font-size: 0.9rem;
+        color: #ffffff;
+    }
+
+    .logout-btn {
+        background: transparent;
+        border: 1px solid #1db954;
+        color: #1db954;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        transition: all 0.2s ease;
+        font-size: 0.9rem;
+        cursor: pointer;
+    }
+
+    .logout-btn:hover {
+        background: rgba(29, 185, 84, 0.1);
+        color: #1ed760;
+    }
+
+    .logout-btn i {
+        margin-right: 0.5rem;
+    }
+
+    .auth-buttons {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .btn-sm {
+        padding: 0.5rem 1rem;
+        font-size: 0.875rem;
+        border-radius: 50px;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        transition: all 0.2s ease;
+        font-weight: 600;
+    }
+
+    .btn-outline-primary {
+        background: transparent;
+        border: 1px solid #1db954;
+        color: #1db954;
+    }
+
+    .btn-outline-primary:hover {
+        background: rgba(29, 185, 84, 0.1);
+        color: #1ed760;
+    }
+
+    .btn-primary {
+        background: #1db954;
+        border: 1px solid #1db954;
+        color: #ffffff;
+    }
+
+    .btn-primary:hover {
+        background: #1ed760;
+        border-color: #1ed760;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(29, 185, 84, 0.3);
+    }
+
+    @@media (max-width: 768px) {
+        .top-navbar {
+            padding: 0.5rem 1rem;
+            flex-wrap: wrap;
+        }
+
+        .nav-links {
+            gap: 1rem;
+        }
+
+        .nav-links a span {
+            display: none;
+        }
+
+        .nav-links a {
+            padding: 0.5rem;
+        }
+
+        .username {
+            display: none;
+        }
+
+        .logout-btn span {
+            display: none;
+        }
+
+        .auth-buttons .btn-sm {
+            padding: 0.4rem 0.8rem;
+            font-size: 0.8rem;
+        }
+    }
+
+    @@media (max-width: 576px) {
+        .nav-links {
+            order: 3;
+            width: 100%;
+            justify-content: center;
+            margin-top: 0.5rem;
+        }
+    }
+</style>
+
 @code {
     private bool _isAuthenticated;
-    private UserProfile? _userProfile;
+    private string? _userEmail;
 
     protected override void OnInitialized()
     {
@@ -89,6 +280,7 @@
     private async void OnLocationChanged(object? sender, LocationChangedEventArgs e)
     {
         await CheckAuthenticationStatus();
+        StateHasChanged();
     }
 
     public void Dispose()
@@ -105,78 +297,23 @@
     {
         try
         {
-            Console.WriteLine("TopNavbar - CheckAuthenticationStatus: Starting check");
-            var token = await SpotifyService.GetAccessTokenAsync();
-            _isAuthenticated = !string.IsNullOrEmpty(token);
-            Console.WriteLine($"TopNavbar - CheckAuthenticationStatus: isAuthenticated = {_isAuthenticated}");
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            _isAuthenticated = authState.User.Identity?.IsAuthenticated == true;
             
             if (_isAuthenticated)
             {
-                // Always fetch the profile when authenticated
-                Console.WriteLine("TopNavbar - CheckAuthenticationStatus: Fetching Spotify profile");
-                var spotifyProfile = await SpotifyService.GetUserProfileAsync();
-                
-                if (spotifyProfile != null)
-                {
-                    Console.WriteLine($"TopNavbar - CheckAuthenticationStatus: Profile received - DisplayName: '{spotifyProfile.DisplayName}', Email: '{spotifyProfile.Email}'");
-                    
-                    string displayName = !string.IsNullOrEmpty(spotifyProfile.DisplayName) 
-                        ? spotifyProfile.DisplayName 
-                        : (!string.IsNullOrEmpty(spotifyProfile.Email) ? spotifyProfile.Email : "Spotify User");
-                    
-                    Console.WriteLine($"TopNavbar - CheckAuthenticationStatus: Using display name: '{displayName}'");
-                    
-                    _userProfile = new UserProfile
-                    {
-                        DisplayName = displayName,
-                        Email = spotifyProfile.Email,
-                        ImageUrl = spotifyProfile.Images?.FirstOrDefault()?.Url
-                    };
-                }
-                else
-                {
-                    Console.WriteLine("TopNavbar - CheckAuthenticationStatus: No profile received from Spotify API, using fallback");
-                    _userProfile = new UserProfile
-                    {
-                        DisplayName = "Spotify User",
-                        Email = "user@example.com"
-                    };
-                }
+                _userEmail = authState.User.FindFirst(ClaimTypes.Email)?.Value;
             }
             else
             {
-                Console.WriteLine("TopNavbar - CheckAuthenticationStatus: Not authenticated");
-                _userProfile = null;
+                _userEmail = null;
             }
-            
-            Console.WriteLine($"TopNavbar - CheckAuthenticationStatus: Final profile - {(_userProfile != null ? $"DisplayName: '{_userProfile.DisplayName}'" : "null")}");
-            StateHasChanged();
         }
         catch (Exception ex)
         {
-            await Console.Error.WriteLineAsync($"Error checking authentication: {ex.Message}");
-        }
-    }
-    
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-        {
-            try
-            {
-                var directToken = await JsRuntime.InvokeAsync<string>("localStorage.getItem", "spotify_access_token");
-                if (!string.IsNullOrEmpty(directToken))
-                {
-                    _isAuthenticated = true;
-                    
-                    // Force an immediate profile fetch
-                    await FetchUserProfileAsync();
-                }
-            }
-            catch (Exception ex)
-            {
-                await Console.Error.WriteLineAsync($"Error in TopNavbar: {ex.Message}");
-            }
+            await JsRuntime.InvokeVoidAsync("console.error", $"Error checking authentication: {ex.Message}");
+            _isAuthenticated = false;
+            _userEmail = null;
         }
     }
     
@@ -191,83 +328,19 @@
     
     private string GetCurrentUsername()
     {
-        // Try to use the profile from state first
-        if (_userProfile != null && !string.IsNullOrEmpty(_userProfile.DisplayName))
-        {
-            return _userProfile.DisplayName;
-        }
-        
-        // If we have a token but no profile yet, fetch it right away
-        if (_isAuthenticated && _userProfile == null)
-        {
-            // This will trigger an async update
-            _ = FetchUserProfileAsync();
-        }
-        
-        // Default fallback
-        return "Spotify User";
+        return !string.IsNullOrEmpty(_userEmail) ? _userEmail : "User";
     }
     
-    private async Task FetchUserProfileAsync()
-    {
-        try 
-        {
-            var spotifyProfile = await SpotifyService.GetUserProfileAsync();
-            if (spotifyProfile != null)
-            {
-                string displayName = !string.IsNullOrEmpty(spotifyProfile.DisplayName) 
-                    ? spotifyProfile.DisplayName 
-                    : (!string.IsNullOrEmpty(spotifyProfile.Email) ? spotifyProfile.Email : "Spotify User");
-                
-                _userProfile = new UserProfile
-                {
-                    DisplayName = displayName,
-                    Email = spotifyProfile.Email,
-                    ImageUrl = spotifyProfile.Images?.FirstOrDefault()?.Url
-                };
-                
-                StateHasChanged();
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"Error fetching user profile: {ex.Message}");
-        }
-    }
-    
-    // Logout is now handled by the dedicated /logout page
-    
-    private async Task AuthenticateWithSpotify()
+    private async Task LogoutAsync()
     {
         try
         {
-            // Log that we're starting authentication
-            await JsRuntime.InvokeVoidAsync("console.log", "Starting Spotify authentication...");
-            
-            // Configure the auth service with your client ID and redirect URI
-            var redirectUri = NavigationManager.BaseUri.TrimEnd('/') + "/callback";
-            await JsRuntime.InvokeVoidAsync("console.log", $"Using redirect URI: {redirectUri}");
-            SpotifyService.Configure("6bf1083c60b743a9841b7db2ca63117b", redirectUri);
-            
-            // Generate the auth URL and redirect
-            var authUrl = await SpotifyService.GenerateAuthUrlAsync();
-            
-            // Log the URL we're navigating to (but mask the client ID for security)
-            var maskedUrl = !string.IsNullOrEmpty(SpotifyService.ClientId) ? authUrl.Replace(SpotifyService.ClientId, "[CLIENT_ID]") : authUrl;
-            await JsRuntime.InvokeVoidAsync("console.log", $"Navigating to auth URL: {maskedUrl}");
-            
-            // Log the requested scopes
-            await JsRuntime.InvokeVoidAsync("console.log", $"Requested scopes: {SpotifyService.RequestedScopes}");
-            
-            // Use a safe redirect approach
-            await JsRuntime.InvokeVoidAsync("eval", $"setTimeout(function() {{ window.location.href = '{authUrl.Replace("'", "\\'")}'; }}, 100);");
+            await AuthService.SignOutUserAsync();
+            NavigationManager.NavigateTo("/", forceLoad: true);
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"Authentication error: {ex.Message}");
-            StateHasChanged();
+            await JsRuntime.InvokeVoidAsync("console.error", $"Logout error: {ex.Message}");
         }
     }
-    
-    public bool IsAuthenticated => _isAuthenticated;
 }

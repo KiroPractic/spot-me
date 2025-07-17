@@ -7,12 +7,16 @@ using Blazorise.Bootstrap5;
 using Blazorise.Icons.FontAwesome;
 using Microsoft.EntityFrameworkCore;
 using SpotMe.Web.Persistency;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Components.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+
 
 // Add Blazorise services
 builder.Services
@@ -26,8 +30,20 @@ builder.Services
 // Register HttpClient
 builder.Services.AddHttpClient();
 
+// Register HttpContext accessor for Blazor
+builder.Services.AddHttpContextAccessor();
+
 // Add CORS services
 builder.Services.AddCors();
+
+// Configure Authentication (minimal setup for Blazor)
+builder.Services.AddAuthentication();
+
+builder.Services.AddAuthorization();
+builder.Services.AddCascadingAuthenticationState();
+
+// Register custom AuthenticationStateProvider
+builder.Services.AddScoped<AuthenticationStateProvider, CustomAuthenticationStateProvider>();
 
 // Configure Blazorise with license key from configuration
 builder.Services.AddBlazorise(options =>
@@ -60,6 +76,11 @@ builder.Services.AddScoped<StatsService>();
 
 // Register User Data service
 builder.Services.AddScoped<UserDataService>();
+
+// Register Authentication services
+builder.Services.AddScoped<PasswordHashingService>();
+builder.Services.AddScoped<UserAuthenticationService>();
+builder.Services.AddScoped<CustomAuthenticationService>();
 
 
 
@@ -108,6 +129,12 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseAntiforgery();
+
+
+
+// Add Authentication and Authorization middleware
+app.UseAuthentication();
+app.UseAuthorization();
 
 // Enable CORS for Spotify API
 app.UseCors(builder => builder

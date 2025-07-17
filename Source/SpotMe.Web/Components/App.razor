@@ -1,5 +1,6 @@
 ﻿@using Microsoft.AspNetCore.Components.Web
 @using Microsoft.AspNetCore.Components.Routing
+@using Microsoft.AspNetCore.Components.Authorization
 @using SpotMe.Web.Components.Layout
 
 <!DOCTYPE html>
@@ -30,7 +31,19 @@
 <body>
 <Router AppAssembly="@typeof(Program).Assembly">
     <Found Context="routeData">
-        <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)"/>
+        <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)">
+            <NotAuthorized>
+                <div class="dark-container">
+                    <div class="spotify-content">
+                        <h1>Not Authorized</h1>
+                        <p class="tagline">You need to be logged in to access this page</p>
+                        <a href="/login" class="spotify-button">
+                            <i class="bi bi-person"></i> Login
+                        </a>
+                    </div>
+                </div>
+            </NotAuthorized>
+        </AuthorizeRouteView>
         <FocusOnNavigate RouteData="@routeData" Selector="h1"/>
     </Found>
     <NotFound>

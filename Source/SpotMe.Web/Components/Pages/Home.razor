@@ -1,322 +1,473 @@
 ﻿@page "/"
-@using SpotMe.Web.Services
-@inject NavigationManager NavigationManager
+@using Microsoft.AspNetCore.Components.Authorization
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IJSRuntime JSRuntime
-@inject SpotifyService AuthService
 @rendermode InteractiveServer
 
-<PageTitle>SpotMe - Home</PageTitle>
+<PageTitle>SpotMe - Your Spotify Insights Platform</PageTitle>
 
-<div class="home-container">
-    <div class="welcome-section">
-        <h1>Welcome to SpotMe</h1>
-        <p>Your personal Spotify experience</p>
-    </div>
-    <div class="user-profile-section">
-        <div class="profile-header">
-            @if (!string.IsNullOrEmpty(ProfileImageUrl))
-            {
-                <img src="@ProfileImageUrl" alt="@ProfileName" class="profile-image" />
-            }
-            else
-            {
-                <div class="profile-placeholder">
-                    <i class="bi bi-person-circle"></i>
-                </div>
-            }
-            <div class="profile-info">
-                <h2>@ProfileName</h2>
-                <p>Connected to Spotify</p>
+@if (isAuthenticated)
+{
+    <!-- Authenticated users get redirected to instructions -->
+    <div class="loading-container">
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
             </div>
-        </div>
-        
-        <div class="stats-section">
-            <div class="stat-card">
-                <i class="bi bi-music-note"></i>
-                <div class="stat-info">
-                    <h3>Playlists</h3>
-                    @if (_isLoadingStats)
-                    {
-                        <p><span class="loading-spinner"></span></p>
-                    }
-                    else
-                    {
-                        <p class="clickable-stat" @onclick="NavigateToPlaylists">@PlaylistsCount</p>
-                    }
-                </div>
-            </div>
-            
-            <div class="stat-card">
-                <i class="bi bi-heart"></i>
-                <div class="stat-info">
-                    <h3>Liked Songs</h3>
-                    @if (_isLoadingStats)
-                    {
-                        <p><span class="loading-spinner"></span></p>
-                    }
-                    else
-                    {
-                        <p class="clickable-stat" @onclick="NavigateToLikedSongs">@LikedSongsCount</p>
-                    }
-                </div>
-            </div>
-            
-            <div class="stat-card">
-                <i class="bi bi-person"></i>
-                <div class="stat-info">
-                    <h3>Following</h3>
-                    @if (_isLoadingStats)
-                    {
-                        <p><span class="loading-spinner"></span></p>
-                    }
-                    else
-                    {
-                        <p>@FollowingCount</p>
-                    }
-                </div>
-            </div>
+            <p class="mt-3">Redirecting to your dashboard...</p>
         </div>
     </div>
-    
-    <div class="recent-activity">
-        <h2>Recent Activity</h2>
-        <p>Coming soon...</p>
-    </div>
-    
-    @if (!string.IsNullOrEmpty(_errorMessage))
-    {
-        <div class="error-message">@_errorMessage</div>
-    }
-</div>
+}
+else
+{
+    <!-- Non-authenticated users see the app overview -->
+    <div class="landing-container">
+        <!-- Hero Section -->
+        <section class="hero-section">
+            <div class="container">
+                <div class="row align-items-center min-vh-100">
+                    <div class="col-lg-6">
+                        <div class="hero-content">
+                            <h1 class="display-4 fw-bold text-primary mb-4">
+                                Unlock Your 
+                                <span class="text-gradient">Spotify Story</span>
+                            </h1>
+                            <p class="lead mb-4">
+                                Dive deep into your music listening patterns, discover hidden insights, 
+                                and explore your personal Spotify journey like never before.
+                            </p>
+                            <div class="hero-actions">
+                                <a href="/register" class="spotify-button me-3">
+                                    <i class="bi bi-person-plus me-2"></i>
+                                    Get Started Free
+                                </a>
+                                <a href="/login" class="spotify-button-secondary">
+                                    <i class="bi bi-box-arrow-in-right me-2"></i>
+                                    Sign In
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="hero-image">
+                            <div class="music-visualization">
+                                <div class="vinyl-record">
+                                    <div class="record-inner">
+                                        <i class="bi bi-spotify"></i>
+                                    </div>
+                                </div>
+                                <div class="sound-waves">
+                                    <div class="wave wave-1"></div>
+                                    <div class="wave wave-2"></div>
+                                    <div class="wave wave-3"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
 
-@code {
-    private string? _errorMessage;
-    private string ProfileName { get; set; } = "Spotify User";
-    private string? ProfileImageUrl { get; set; }
-    private int PlaylistsCount { get; set; } = 0;
-    private int LikedSongsCount { get; set; } = 0;
-    private int FollowingCount { get; set; } = 0;
-    private bool _isLoadingStats = true;
-    
-    protected override async Task OnInitializedAsync()
-    {
-        try 
-        {
-            // Check if user is authenticated right away
-            var token = await AuthService.GetAccessTokenAsync();
-            
-            if (string.IsNullOrEmpty(token))
-            {
-                // Not authenticated, redirect to auth
-                await JSRuntime.InvokeVoidAsync("console.log", "User not authenticated, redirecting to auth page");
-                NavigationManager.NavigateTo("/auth", forceLoad: false);
-                return;
-            }
-            
-            // Get user profile info from Spotify
-            var profile = await AuthService.GetUserProfileAsync();
-            if (profile != null)
-            {
-               
-                ProfileName =  profile.DisplayName!;
-                ProfileImageUrl = profile.Images?.FirstOrDefault()?.Url;
-            }
-            
-            // Start loading user stats in parallel
-            await LoadUserStatsAsync();
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"Error in Home initialization: {ex.Message}");
-            _errorMessage = $"Error: {ex.Message}";
-        }
-    }
-    
-    private async Task LoadUserStatsAsync()
-    {
-        try
-        {
-            _isLoadingStats = true;
-            
-            // Create tasks to load stats in parallel
-            var playlistsTask = AuthService.GetPlaylistsCountAsync();
-            var likedSongsTask = AuthService.GetSavedTracksCountAsync();
-            var followingTask = AuthService.GetFollowedArtistsCountAsync();
-            
-            // Wait for all tasks to complete
-            await Task.WhenAll(playlistsTask, likedSongsTask, followingTask);
-            
-            // Get results - with fallback values in case any API fails
-            PlaylistsCount = await playlistsTask;
-            
-            try { LikedSongsCount = await likedSongsTask; } 
-            catch (Exception ex) 
-            { 
-                await JSRuntime.InvokeVoidAsync("console.error", $"Error getting liked songs count: {ex.Message}");
-            }
-            
-            try { FollowingCount = await followingTask; } 
-            catch (Exception ex) 
-            { 
-                await JSRuntime.InvokeVoidAsync("console.error", $"Error getting following count: {ex.Message}");
-            }
-            
-            await JSRuntime.InvokeVoidAsync("console.log", $"Stats loaded - Playlists: {PlaylistsCount}, Liked Songs: {LikedSongsCount}, Following: {FollowingCount}");
-            
-            _isLoadingStats = false;
-            StateHasChanged();
-        }
-        catch (Exception ex)
-        {
-            await JSRuntime.InvokeVoidAsync("console.error", $"Error loading stats: {ex.Message}");
-            _isLoadingStats = false;
-        }
-    }
-    
-    private void NavigateToPlaylists()
-    {
-        NavigationManager.NavigateTo("/playlists");
-    }
-    
-    private void NavigateToLikedSongs()
-    {
-        NavigationManager.NavigateTo("/playlists/liked");
-    }
+        <!-- Features Section -->
+        <section class="features-section py-5">
+            <div class="container">
+                <div class="row text-center mb-5">
+                    <div class="col-lg-8 mx-auto">
+                        <h2 class="display-5 fw-bold mb-3">Discover What SpotMe Offers</h2>
+                        <p class="lead">Transform your Spotify data into meaningful insights and beautiful visualizations</p>
+                    </div>
+                </div>
+                
+                <div class="row g-4">
+                    <div class="col-md-4">
+                        <div class="feature-card h-100">
+                            <div class="feature-icon">
+                                <i class="bi bi-graph-up"></i>
+                            </div>
+                            <h4>Detailed Analytics</h4>
+                            <p>Get comprehensive statistics about your listening habits, top tracks, artists, and genres over time.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="feature-card h-100">
+                            <div class="feature-icon">
+                                <i class="bi bi-globe"></i>
+                            </div>
+                            <h4>Geographic Insights</h4>
+                            <p>Explore where you've listened to music around the world with interactive maps and location data.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="feature-card h-100">
+                            <div class="feature-icon">
+                                <i class="bi bi-clock-history"></i>
+                            </div>
+                            <h4>Time Patterns</h4>
+                            <p>Discover your peak listening hours, seasonal trends, and how your music taste evolves over time.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="feature-card h-100">
+                            <div class="feature-icon">
+                                <i class="bi bi-music-note-list"></i>
+                            </div>
+                            <h4>Playlist Analysis</h4>
+                            <p>Analyze your playlists, track your music discovery journey, and find patterns in your saved music.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="feature-card h-100">
+                            <div class="feature-icon">
+                                <i class="bi bi-shield-check"></i>
+                            </div>
+                            <h4>Privacy First</h4>
+                            <p>Your data stays secure. We process everything locally and never share your personal listening data.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="feature-card h-100">
+                            <div class="feature-icon">
+                                <i class="bi bi-file-earmark-text"></i>
+                            </div>
+                            <h4>Export & Share</h4>
+                            <p>Generate beautiful reports and visualizations you can save or share with friends and social media.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- How It Works Section -->
+        <section class="how-it-works-section py-5">
+            <div class="container">
+                <div class="row text-center mb-5">
+                    <div class="col-lg-8 mx-auto">
+                        <h2 class="display-5 fw-bold mb-3">How It Works</h2>
+                        <p class="lead">Get started with SpotMe in just a few simple steps</p>
+                    </div>
+                </div>
+                
+                <div class="row g-4">
+                    <div class="col-md-4 text-center">
+                        <div class="step-card">
+                            <div class="step-number">1</div>
+                            <h4>Create Account</h4>
+                            <p>Sign up for your free SpotMe account with just your email and a secure password.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4 text-center">
+                        <div class="step-card">
+                            <div class="step-number">2</div>
+                            <h4>Get Your Data</h4>
+                            <p>Download your extended streaming history from Spotify's privacy settings page.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4 text-center">
+                        <div class="step-card">
+                            <div class="step-number">3</div>
+                            <h4>Explore Insights</h4>
+                            <p>Upload your data and start exploring your personalized music insights and visualizations.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- CTA Section -->
+        <section class="cta-section py-5">
+            <div class="container">
+                <div class="row text-center">
+                    <div class="col-lg-8 mx-auto">
+                        <h2 class="display-5 fw-bold mb-4">Ready to Explore Your Music Journey?</h2>
+                        <p class="lead mb-4">
+                            Join thousands of music lovers who have already discovered fascinating insights about their listening habits.
+                        </p>
+                        <div class="cta-actions">
+                            <a href="/register" class="spotify-button me-3">
+                                <i class="bi bi-person-plus me-2"></i>
+                                Start Your Journey
+                            </a>
+                            <a href="/login" class="spotify-button-secondary">
+                                <i class="bi bi-box-arrow-in-right me-2"></i>
+                                Already Have an Account?
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
 }
 
 <style>
-    .home-container {
-        padding: 1.5rem;
-        max-width: 1000px;
-        margin: 0 auto;
-    }
-    
-    .welcome-section {
-        margin-bottom: 2rem;
-    }
-    
-    .welcome-section h1 {
-        font-size: 2.5rem;
-        color: #fff;
-        margin-bottom: 0.5rem;
-    }
-    
-    .welcome-section p {
-        font-size: 1.2rem;
-        color: #b3b3b3;
-    }
-    
-    .user-profile-section {
-        background-color: #282828;
-        border-radius: 8px;
-        padding: 1.5rem;
-        margin-bottom: 2rem;
-    }
-    
-    .profile-header {
-        display: flex;
-        align-items: center;
-        margin-bottom: 1.5rem;
-    }
-    
-    .profile-image,
-    .profile-placeholder {
-        width: 80px;
-        height: 80px;
-        border-radius: 50%;
-        background-color: #333;
+    .loading-container {
+        min-height: 100vh;
         display: flex;
         align-items: center;
         justify-content: center;
-        margin-right: 1.5rem;
-        overflow: hidden;
+        background: linear-gradient(135deg, #121212 0%, #1E1E1E 100%);
+        color: #ffffff;
     }
-    
-    .profile-image {
-        object-fit: cover;
+
+    .landing-container {
+        background: linear-gradient(135deg, #121212 0%, #1E1E1E 100%);
+        color: #ffffff;
+        min-height: 100vh;
     }
-    
-    .profile-placeholder i {
-        font-size: 40px;
+
+    .hero-section {
+        background: linear-gradient(135deg, #121212 0%, #1E1E1E 100%);
+        color: #ffffff;
+        position: relative;
+        padding: 4rem 0;
+    }
+
+    .hero-section p {
         color: #b3b3b3;
     }
-    
-    .profile-info h2 {
-        margin: 0 0 0.5rem 0;
-        color: #fff;
-    }
-    
-    .profile-info p {
-        margin: 0;
+
+    .text-gradient {
         color: #1DB954;
     }
-    
-    .stats-section {
-        display: flex;
-        gap: 1rem;
+
+    .hero-content {
+        position: relative;
+        z-index: 2;
     }
-    
-    .stat-card {
-        flex: 1;
-        background-color: #181818;
-        border-radius: 6px;
-        padding: 1rem;
+
+    .music-visualization {
         display: flex;
         align-items: center;
+        justify-content: center;
+        position: relative;
+        height: 400px;
     }
-    
-    .stat-card i {
-        font-size: 24px;
-        color: #1DB954;
-        margin-right: 1rem;
+
+    .vinyl-record {
+        width: 200px;
+        height: 200px;
+        background: linear-gradient(45deg, #2c2c2c, #1a1a1a);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        animation: spin 20s linear infinite;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
     }
-    
-    .stat-info h3 {
-        margin: 0 0 0.25rem 0;
-        font-size: 0.9rem;
-        color: #b3b3b3;
-    }
-    
-    .clickable-stat {
-        cursor: pointer;
-        transition: color 0.2s;
-    }
-    
-    .clickable-stat:hover {
-        color: #1DB954;
-        text-decoration: underline;
-    }
-    
-    .stat-info p {
-        margin: 0;
-        font-size: 1.25rem;
-        font-weight: 600;
-        color: #fff;
-    }
-    
-    .recent-activity {
-        background-color: #282828;
-        border-radius: 8px;
-        padding: 1.5rem;
-    }
-    
-    .recent-activity h2 {
-        margin-top: 0;
-        color: #fff;
+
+    .record-inner {
+        width: 60px;
+        height: 60px;
+        background: #1db954;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
         font-size: 1.5rem;
     }
-    
-    .recent-activity p {
+
+    .sound-waves {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+    }
+
+    .wave {
+        position: absolute;
+        border: 2px solid rgba(29, 185, 84, 0.3);
+        border-radius: 50%;
+        animation: pulse 2s ease-in-out infinite;
+    }
+
+    .wave-1 {
+        width: 280px;
+        height: 280px;
+        margin: -140px 0 0 -140px;
+        animation-delay: 0s;
+    }
+
+    .wave-2 {
+        width: 360px;
+        height: 360px;
+        margin: -180px 0 0 -180px;
+        animation-delay: 0.7s;
+    }
+
+    .wave-3 {
+        width: 440px;
+        height: 440px;
+        margin: -220px 0 0 -220px;
+        animation-delay: 1.4s;
+    }
+
+    @@keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+
+    @@keyframes pulse {
+        0% {
+            transform: scale(0.8);
+            opacity: 1;
+        }
+        100% {
+            transform: scale(1.2);
+            opacity: 0;
+        }
+    }
+
+    .features-section {
+        background-color: #181818;
+        padding: 4rem 0;
+    }
+
+    .features-section p, .features-section .lead {
         color: #b3b3b3;
     }
-    
-    .loading-spinner {
-        display: inline-block;
-        width: 1.25rem;
-        height: 1.25rem;
-        border: 2px solid rgba(255, 255, 255, 0.1);
+
+    .features-section h2 {
+        color: #ffffff;
+    }
+
+    .feature-card {
+        background-color: #282828;
+        padding: 2rem;
+        border-radius: 12px;
+        border: 1px solid #404040;
+        transition: all 0.3s ease;
+        text-align: center;
+        color: #ffffff;
+    }
+
+    .feature-card:hover {
+        transform: translateY(-5px);
+        background-color: #333333;
+        border-color: #1DB954;
+    }
+
+    .feature-card h4 {
+        color: #ffffff;
+        margin-bottom: 1rem;
+    }
+
+    .feature-card p {
+        color: #b3b3b3;
+    }
+
+    .feature-icon {
+        width: 80px;
+        height: 80px;
+        margin: 0 auto 1.5rem;
+        background: #1DB954;
         border-radius: 50%;
-        border-top-color: #1DB954;
-        animation: spin 1s ease-in-out infinite;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 2rem;
+    }
+
+    .how-it-works-section {
+        background-color: #121212;
+        padding: 4rem 0;
+    }
+
+    .how-it-works-section p, .how-it-works-section .lead {
+        color: #b3b3b3;
+    }
+
+    .how-it-works-section h2 {
+        color: #ffffff;
+    }
+
+    .step-card {
+        padding: 2rem 1rem;
+        color: #ffffff;
+    }
+
+    .step-card h4 {
+        color: #ffffff;
+        margin-bottom: 1rem;
+    }
+
+    .step-card p {
+        color: #b3b3b3;
+    }
+
+    .step-number {
+        width: 60px;
+        height: 60px;
+        margin: 0 auto 1.5rem;
+        background: #1DB954;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1.5rem;
+        font-weight: bold;
+    }
+
+    .cta-section {
+        background-color: #181818;
+        padding: 4rem 0;
+    }
+
+    .cta-section h2 {
+        color: #ffffff;
+    }
+
+    .cta-section p, .cta-section .lead {
+        color: #b3b3b3;
+    }
+
+    @@media (max-width: 768px) {
+        .hero-actions .spotify-button,
+        .cta-actions .spotify-button {
+            width: 100%;
+            margin-bottom: 1rem;
+            display: block;
+            text-align: center;
+        }
+        
+        .music-visualization {
+            height: 300px;
+        }
+        
+        .vinyl-record {
+            width: 150px;
+            height: 150px;
+        }
+        
+        .wave-1, .wave-2, .wave-3 {
+            display: none;
+        }
     }
 </style>
+
+@code {
+    private bool isAuthenticated = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Check if user is authenticated
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        isAuthenticated = authState.User.Identity?.IsAuthenticated == true;
+
+        if (isAuthenticated)
+        {
+            // Redirect authenticated users to instructions page
+            Navigation.NavigateTo("/instructions", forceLoad: true);
+        }
+    }
+}

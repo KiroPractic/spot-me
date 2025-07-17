@@ -3,5 +3,5 @@
 public sealed class User : Entity
 {
     public required string EmailAddress { get; set; }
-    public string PasswordHash { get; private set; } = string.Empty;
+    public string PasswordHash { get; set; } = string.Empty;
 }

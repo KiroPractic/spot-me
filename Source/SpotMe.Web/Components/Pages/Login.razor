@@ -1,0 +1,256 @@
+@page "/login"
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Components.Authorization
+@using SpotMe.Web.Services
+@inject UserAuthenticationService AuthService
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@rendermode InteractiveServer
+
+<PageTitle>SpotMe - Login</PageTitle>
+
+<div class="login-container">
+    <div class="login-card">
+        <div class="text-center mb-4">
+            <h1 class="h3 mb-3 fw-normal">Sign In to SpotMe</h1>
+            <p>Enter your credentials to access your account</p>
+        </div>
+
+        <EditForm Model="@loginModel" OnValidSubmit="@HandleLogin" class="login-form">
+            <DataAnnotationsValidator />
+            <Microsoft.AspNetCore.Components.Forms.ValidationSummary class="alert alert-danger" />
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger">@errorMessage</div>
+            }
+
+            <div class="mb-3">
+                <label for="email" class="form-label">Email address</label>
+                <InputText @bind-Value="loginModel.Email" 
+                          class="form-control" 
+                          id="email" 
+                          placeholder="Enter your email" 
+                          autocomplete="email" />
+                <ValidationMessage For="@(() => loginModel.Email)" class="text-danger" />
+            </div>
+
+            <div class="mb-3">
+                <label for="password" class="form-label">Password</label>
+                <div class="password-input-container">
+                    <InputText @bind-Value="loginModel.Password" 
+                              type="password" 
+                              class="form-control" 
+                              id="password" 
+                              placeholder="Enter your password" 
+                              autocomplete="current-password" />
+                    <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('password')">
+                        <i class="bi bi-eye" id="password-eye"></i>
+                    </button>
+                </div>
+                <ValidationMessage For="@(() => loginModel.Password)" class="text-danger" />
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100 mb-3" disabled="@isLoading">
+                @if (isLoading)
+                {
+                    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                    <span>Signing in...</span>
+                }
+                else
+                {
+                    <span>Sign In</span>
+                }
+            </button>
+        </EditForm>
+
+        <div class="text-center">
+            <p>
+                Don't have an account? 
+                <a href="/register" class="text-decoration-none">Sign up here</a>
+            </p>
+        </div>
+    </div>
+</div>
+
+<style>
+    .login-container {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #121212 0%, #1E1E1E 100%);
+        padding: 2rem 1rem;
+    }
+
+    .login-card {
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 12px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        padding: 3rem;
+        width: 100%;
+        max-width: 400px;
+        border: 1px solid #282828;
+    }
+
+    .login-card h1 {
+        color: #1DB954;
+    }
+
+    .login-card p {
+        color: #b3b3b3;
+    }
+
+    .form-label {
+        color: #ffffff;
+        font-weight: 500;
+        margin-bottom: 0.5rem;
+    }
+
+    .form-control {
+        background-color: #282828 !important;
+        border: 1px solid #404040;
+        color: #ffffff !important;
+        padding: 12px 16px;
+        border-radius: 8px;
+    }
+
+    .form-control::placeholder {
+        color: #b3b3b3;
+    }
+
+    .form-control:focus {
+        background-color: #282828 !important;
+        border-color: #1DB954;
+        color: #ffffff !important;
+        box-shadow: 0 0 0 0.2rem rgba(29, 185, 84, 0.25);
+    }
+
+    .btn-primary {
+        background-color: #1DB954;
+        border: none;
+        padding: 12px;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+        border-radius: 50px;
+    }
+
+    .btn-primary:hover {
+        background-color: #1ed760;
+        transform: translateY(-1px);
+        box-shadow: 0 5px 15px rgba(29, 185, 84, 0.3);
+    }
+
+    .text-center a {
+        color: #1DB954;
+        text-decoration: none;
+    }
+
+    .text-center a:hover {
+        color: #1ed760;
+        text-decoration: underline;
+    }
+
+    .alert-danger {
+        background-color: rgba(220, 53, 69, 0.1) !important;
+        border: 1px solid rgba(220, 53, 69, 0.3) !important;
+        color: #f8d7da !important;
+        border-radius: 8px;
+    }
+
+    .password-input-container {
+        position: relative;
+    }
+
+    .password-toggle-btn {
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        color: #b3b3b3;
+        cursor: pointer;
+        padding: 0;
+        font-size: 1.1rem;
+        z-index: 10;
+    }
+
+    .password-toggle-btn:hover {
+        color: #1DB954;
+    }
+</style>
+
+@code {
+    private LoginModel loginModel = new();
+    private string? errorMessage;
+    private bool isLoading = false;
+
+    public class LoginModel
+    {
+        [Required(ErrorMessage = "Email is required")]
+        [EmailAddress(ErrorMessage = "Please enter a valid email address")]
+        public string Email { get; set; } = "";
+
+        [Required(ErrorMessage = "Password is required")]
+        public string Password { get; set; } = "";
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Check if user is already authenticated
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        if (authState.User.Identity?.IsAuthenticated == true)
+        {
+            Navigation.NavigateTo("/instructions");
+        }
+    }
+
+    private async Task HandleLogin()
+    {
+        isLoading = true;
+        errorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            var result = await AuthService.SignInUserAsync(loginModel.Email, loginModel.Password);
+
+            if (result.Success)
+            {
+                // Redirect to instructions page
+                Navigation.NavigateTo("/instructions", forceLoad: true);
+            }
+            else
+            {
+                errorMessage = result.Message;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "An error occurred during login. Please try again.";
+            await JSRuntime.InvokeVoidAsync("console.error", $"Login error: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+}
+
+<script>
+    function togglePasswordVisibility(inputId) {
+        const passwordInput = document.getElementById(inputId);
+        const eyeIcon = document.getElementById(inputId + '-eye');
+        
+        if (passwordInput.type === 'password') {
+            passwordInput.type = 'text';
+            eyeIcon.className = 'bi bi-eye-slash';
+        } else {
+            passwordInput.type = 'password';
+            eyeIcon.className = 'bi bi-eye';
+        }
+    }
+</script> 
