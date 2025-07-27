@@ -203,7 +203,7 @@
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         if (authState.User.Identity?.IsAuthenticated == true)
         {
-            Navigation.NavigateTo("/instructions");
+            Navigation.NavigateTo("/data");
         }
     }
 
@@ -219,8 +219,8 @@
 
             if (result.Success)
             {
-                // Redirect to instructions page
-                Navigation.NavigateTo("/instructions", forceLoad: true);
+                // Redirect to data page
+                Navigation.NavigateTo("/data");
             }
             else
             {

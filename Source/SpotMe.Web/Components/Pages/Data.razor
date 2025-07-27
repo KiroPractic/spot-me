@@ -1,0 +1,853 @@
+@page "/data"
+@using SpotMe.Web.Services
+@using SpotMe.Web.Models
+@using Microsoft.AspNetCore.Components.Authorization
+@inject UserDataService UserDataService
+@inject StatsService StatsService
+@inject IJSRuntime JSRuntime
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<PageTitle>SpotMe - My Data</PageTitle>
+
+<div class="data-container">
+    @if (!_hasData)
+    {
+        <!-- Instructions Section (when no data) -->
+        <div class="container">
+            <div class="row justify-content-center">
+                <div class="col-lg-8">
+                    <div class="welcome-header text-center mb-5">
+                        <h1 class="display-5 fw-bold text-primary mb-3">Welcome to SpotMe! 🎵</h1>
+                        <p class="lead text-muted">Let's get your Spotify data imported so you can explore your music insights</p>
+                    </div>
+
+                    <div class="instruction-card">
+                        <div class="card-header bg-primary text-white">
+                            <h3 class="card-title mb-0">
+                                <i class="bi bi-download me-2"></i>
+                                Step 1: Download Your Spotify Data
+                            </h3>
+                        </div>
+                        <div class="card-body">
+                            <ol class="instruction-list">
+                                <li>
+                                    <strong>Visit Spotify's Privacy Settings:</strong>
+                                    <br>
+                                    Go to <a href="https://www.spotify.com/account/privacy/" target="_blank" class="text-primary">
+                                        spotify.com/account/privacy/
+                                        <i class="bi bi-box-arrow-up-right ms-1"></i>
+                                    </a>
+                                </li>
+                                <li>
+                                    <strong>Request Your Data:</strong>
+                                    <br>
+                                    Scroll down to "Download your data" section and click "Request data download"
+                                </li>
+                                <li>
+                                    <strong>Select Extended Streaming History:</strong>
+                                    <br>
+                                    Make sure to check "Extended streaming history" - this contains the detailed listening data we need
+                                </li>
+                                <li>
+                                    <strong>Wait for the Email:</strong>
+                                    <br>
+                                    Spotify will email you when your data is ready (usually takes 1-30 days)
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+
+                    <div class="instruction-card">
+                        <div class="card-header bg-success text-white">
+                            <h3 class="card-title mb-0">
+                                <i class="bi bi-upload me-2"></i>
+                                Step 2: Upload Your Data Files
+                            </h3>
+                        </div>
+                        <div class="card-body">
+                            <p class="mb-3">Once you receive your Spotify data:</p>
+                            <ol class="instruction-list">
+                                <li>Extract the ZIP file you received from Spotify</li>
+                                <li>Look for JSON files named like <code>Streaming_History_Audio_YYYY-YYYY_X.json</code></li>
+                                <li>Upload these files using the upload section below</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Upload Section -->
+    <div class="container mt-4">
+        <div class="row justify-content-center">
+            <div class="@(_hasData ? "col-12" : "col-lg-8")">
+                @if (!string.IsNullOrEmpty(_errorMessage))
+                {
+                    <div class="alert alert-danger custom-alert">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        <strong>Error:</strong> @_errorMessage
+                    </div>
+                }
+
+                @if (!string.IsNullOrEmpty(_successMessage))
+                {
+                    <div class="alert alert-success custom-alert">
+                        <i class="bi bi-check-circle me-2"></i>
+                        <strong>Success:</strong> @_successMessage
+                    </div>
+                }
+
+                <div class="card upload-card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="bi bi-cloud-upload me-2"></i>
+                            @if (_hasData)
+                            {
+                                <span>Upload Additional Data Files</span>
+                            }
+                            else
+                            {
+                                <span>Upload Your Spotify Data Files</span>
+                            }
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text mb-4">Upload your Spotify streaming history JSON files downloaded from Spotify.</p>
+                        
+                        <div class="mb-3">
+                            <label for="fileInput" class="form-label">Select JSON Files</label>
+                            <InputFile id="fileInput" class="form-control file-input" multiple OnChange="OnFilesSelected" accept=".json" />
+                            <div class="form-text">You can select multiple JSON files at once. Only .json files are accepted.</div>
+                        </div>
+
+                        @if (_selectedFiles?.Any() == true)
+                        {
+                            <div class="mb-3">
+                                <h6>Selected Files:</h6>
+                                <ul class="list-group list-group-flush">
+                                    @foreach (var file in _selectedFiles)
+                                    {
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            @file.Name
+                                            <span class="badge bg-secondary rounded-pill">@FormatFileSize(file.Size)</span>
+                                        </li>
+                                    }
+                                </ul>
+                            </div>
+                        }
+
+                        <button class="btn btn-primary btn-upload" @onclick="UploadFiles" disabled="@(_isUploading || _selectedFiles?.Any() != true)">
+                            @if (_isUploading)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                <span>Uploading...</span>
+                            }
+                            else
+                            {
+                                <i class="bi bi-cloud-upload me-2"></i>
+                                <span>Upload Files</span>
+                            }
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (_hasData)
+    {
+        <!-- Data Overview Section -->
+        <div class="container mt-4">
+            <!-- Storage Stats -->
+            @if (_storageStats != null)
+            {
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="card stat-card">
+                            <div class="card-body text-center">
+                                <h6 class="card-title">Total Files</h6>
+                                <p class="card-text h4">@_storageStats.TotalFiles</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card stat-card">
+                            <div class="card-body text-center">
+                                <h6 class="card-title">Total Size</h6>
+                                <p class="card-text h4">@_storageStats.TotalSizeFormatted</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card stat-card">
+                            <div class="card-body text-center">
+                                <h6 class="card-title">Total Entries</h6>
+                                <p class="card-text h4">@_storageStats.TotalEntries.ToString("N0")</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card stat-card">
+                            <div class="card-body text-center">
+                                <h6 class="card-title">Average per File</h6>
+                                <p class="card-text h4">@(_storageStats.TotalFiles > 0 ? (_storageStats.TotalEntries / _storageStats.TotalFiles).ToString("N0") : "0")</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <!-- Files List -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h5 class="card-title mb-0">Your Uploaded Files</h5>
+                                <div>
+                                    <button class="btn btn-outline-secondary btn-sm me-2" @onclick="LoadUserFiles">
+                                        <i class="fas fa-refresh me-2"></i>Refresh
+                                    </button>
+                                    <a href="/stats" class="btn btn-success btn-sm">
+                                        <i class="bi bi-graph-up me-2"></i>View Stats
+                                    </a>
+                                </div>
+                            </div>
+
+                            @if (_isLoading)
+                            {
+                                <div class="text-center py-4">
+                                    <div class="spinner-border" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                </div>
+                            }
+                            else if (_userFiles?.Any() == true)
+                            {
+                                <div class="table-responsive">
+                                    <table class="table table-dark table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>File Name</th>
+                                                <th>File Size</th>
+                                                <th>Entries</th>
+                                                <th>Uploaded</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var file in _userFiles)
+                                            {
+                                                <tr>
+                                                    <td>@file.FileName</td>
+                                                    <td>@file.FileSizeFormatted</td>
+                                                    <td>@file.EntryCount.ToString("N0")</td>
+                                                    <td>@file.UploadedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                                                    <td>
+                                                        <button class="btn btn-outline-danger btn-sm" @onclick="() => DeleteFile(file.FileName)" title="Delete file">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="bi bi-graph-up me-2"></i>
+                                Explore Your Music Insights
+                            </h5>
+                            <p class="mb-3">Now that you have data uploaded, explore your music insights:</p>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <ul class="feature-list">
+                                        <li><i class="bi bi-bar-chart text-primary"></i> Detailed listening statistics</li>
+                                        <li><i class="bi bi-music-note text-primary"></i> Top tracks and artists</li>
+                                        <li><i class="bi bi-calendar text-primary"></i> Listening patterns over time</li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-6">
+                                    <ul class="feature-list">
+                                        <li><i class="bi bi-globe text-primary"></i> Geographic listening data</li>
+                                        <li><i class="bi bi-clock text-primary"></i> Peak listening hours</li>
+                                        <li><i class="bi bi-heart text-primary"></i> Personal music trends</li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <div class="explore-actions mt-4">
+                                <a href="/stats" class="btn btn-primary btn-lg me-3">
+                                    <i class="bi bi-graph-up me-2"></i>
+                                    View Detailed Stats
+                                </a>
+                                <a href="/playlists" class="btn btn-outline-primary btn-lg">
+                                    <i class="bi bi-music-note-list me-2"></i>
+                                    Browse Playlists
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (!_hasData)
+    {
+        <!-- Help Section -->
+        <div class="container mt-5">
+            <div class="row justify-content-center">
+                <div class="col-lg-8">
+                    <div class="help-section text-center">
+                        <div class="help-card">
+                            <div class="help-icon">
+                                <i class="bi bi-question-circle"></i>
+                            </div>
+                            <h5 class="help-heading">
+                                Need Help?
+                            </h5>
+                            <p class="help-text">
+                                If you're having trouble with any of these steps, feel free to reach out for support. 
+                                Your privacy is important to us - all data processing happens locally and securely.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .data-container {
+        background: linear-gradient(135deg, #121212 0%, #1E1E1E 100%);
+        min-height: 100vh;
+        padding: 2rem 0;
+        color: #ffffff;
+    }
+
+    .welcome-header h1 {
+        color: #1DB954;
+    }
+
+    .welcome-header p {
+        color: #b3b3b3;
+    }
+
+    .instruction-card {
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 12px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        margin-bottom: 2rem;
+        overflow: hidden;
+        transition: transform 0.2s ease;
+        border: 1px solid #282828;
+    }
+
+    .instruction-card:hover {
+        transform: translateY(-2px);
+        border-color: #1DB954;
+    }
+
+    .card {
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid #282828;
+        border-radius: 12px;
+        color: #ffffff;
+    }
+
+    .card-header {
+        padding: 1.5rem;
+        border-bottom: 1px solid #282828;
+    }
+
+    .bg-primary {
+        background-color: #1DB954 !important;
+    }
+
+    .bg-success {
+        background-color: #1DB954 !important;
+    }
+
+    .card-body {
+        padding: 2rem;
+        color: #ffffff;
+    }
+
+    .card-body p {
+        color: #b3b3b3;
+    }
+
+    .instruction-list {
+        counter-reset: step-counter;
+        list-style: none;
+        padding-left: 0;
+    }
+
+    .instruction-list li {
+        counter-increment: step-counter;
+        margin-bottom: 1.5rem;
+        padding-left: 3rem;
+        position: relative;
+        color: #ffffff;
+    }
+
+    .instruction-list li::before {
+        content: counter(step-counter);
+        position: absolute;
+        left: 0;
+        top: 0;
+        background: #1DB954;
+        color: white;
+        width: 2rem;
+        height: 2rem;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 0.9rem;
+    }
+
+    .feature-list {
+        list-style: none;
+        padding-left: 0;
+    }
+
+    .feature-list li {
+        padding: 0.5rem 0;
+        display: flex;
+        align-items: center;
+        color: #ffffff;
+    }
+
+    .feature-list li i {
+        margin-right: 0.75rem;
+        font-size: 1.1rem;
+        color: #1DB954;
+    }
+
+    .stat-card {
+        transition: transform 0.2s ease;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-2px);
+        border-color: #1DB954;
+    }
+
+    .explore-actions {
+        text-align: center;
+    }
+
+    .btn-lg {
+        padding: 12px 30px;
+        font-weight: 600;
+        border-radius: 50px;
+        transition: all 0.2s ease;
+        text-decoration: none;
+    }
+
+    .btn-primary {
+        background-color: #1DB954;
+        border-color: #1DB954;
+        color: #ffffff;
+    }
+
+    .btn-primary:hover {
+        background-color: #1ed760;
+        border-color: #1ed760;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 15px rgba(29, 185, 84, 0.3);
+    }
+
+    .btn-outline-primary {
+        background-color: transparent;
+        border-color: #1DB954;
+        color: #1DB954;
+    }
+
+    .btn-outline-primary:hover {
+        background-color: rgba(29, 185, 84, 0.1);
+        border-color: #1ed760;
+        color: #1ed760;
+        transform: translateY(-1px);
+    }
+
+    .btn-success {
+        background-color: #1DB954;
+        border-color: #1DB954;
+        color: #ffffff;
+    }
+
+    .btn-success:hover {
+        background-color: #1ed760;
+        border-color: #1ed760;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 15px rgba(29, 185, 84, 0.3);
+    }
+
+    code {
+        background: #282828;
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.9rem;
+        color: #1DB954;
+        border: 1px solid #404040;
+    }
+
+    .alert-light {
+        background: rgba(40, 40, 40, 0.8);
+        border: 1px solid #404040;
+        color: #ffffff;
+    }
+
+    .alert-heading {
+        color: #1DB954;
+    }
+
+    .text-primary {
+        color: #1DB954 !important;
+    }
+
+    .text-success {
+        color: #1DB954 !important;
+    }
+
+    .form-control {
+        background-color: #282828 !important;
+        border: 1px solid #404040;
+        color: #ffffff !important;
+    }
+
+    .form-control:focus {
+        background-color: #282828 !important;
+        border-color: #1DB954;
+        color: #ffffff !important;
+        box-shadow: 0 0 0 0.2rem rgba(29, 185, 84, 0.25);
+    }
+
+    .form-text {
+        color: #b3b3b3;
+        font-size: 0.875rem;
+        margin-top: 0.5rem;
+    }
+
+    .upload-card {
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid #282828;
+        border-radius: 12px;
+        color: #ffffff;
+        transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+
+    .upload-card:hover {
+        transform: translateY(-2px);
+        border-color: #1DB954;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    }
+
+    .upload-card .card-header {
+        background: linear-gradient(135deg, #1DB954 0%, #1ed760 100%);
+        border-bottom: 1px solid #282828;
+        border-radius: 12px 12px 0 0;
+        padding: 1.5rem;
+    }
+
+    .upload-card .card-header .card-title {
+        color: #ffffff;
+        font-weight: 600;
+        margin: 0;
+    }
+
+    .file-input {
+        background-color: #282828 !important;
+        border: 2px dashed #404040;
+        color: #ffffff !important;
+        padding: 1rem;
+        border-radius: 8px;
+        transition: border-color 0.2s ease;
+    }
+
+    .file-input:hover {
+        border-color: #1DB954;
+    }
+
+    .file-input:focus {
+        border-color: #1DB954;
+        box-shadow: 0 0 0 0.2rem rgba(29, 185, 84, 0.25);
+    }
+
+    .btn-upload {
+        padding: 12px 30px;
+        font-weight: 600;
+        border-radius: 50px;
+        transition: all 0.2s ease;
+        background: linear-gradient(135deg, #1DB954 0%, #1ed760 100%);
+        border: none;
+        color: #ffffff;
+        font-size: 1rem;
+    }
+
+    .btn-upload:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(29, 185, 84, 0.4);
+        background: linear-gradient(135deg, #1ed760 0%, #1DB954 100%);
+    }
+
+    .btn-upload:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+    }
+
+    .help-card {
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid #282828;
+        border-radius: 12px;
+        padding: 2.5rem;
+        transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+
+    .help-card:hover {
+        transform: translateY(-2px);
+        border-color: #1DB954;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    }
+
+    .help-icon {
+        margin-bottom: 1.5rem;
+    }
+
+    .help-icon i {
+        font-size: 3rem;
+        color: #1DB954;
+    }
+
+    .help-heading {
+        color: #1DB954;
+        font-weight: 600;
+        margin-bottom: 1rem;
+        font-size: 1.5rem;
+    }
+
+    .help-text {
+        color: #b3b3b3;
+        line-height: 1.6;
+        margin: 0;
+        font-size: 1rem;
+    }
+
+    .custom-alert {
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid #282828;
+        border-radius: 8px;
+        color: #ffffff;
+        padding: 1rem 1.5rem;
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+    }
+
+    .alert-danger.custom-alert {
+        background: rgba(220, 53, 69, 0.1);
+        border-color: rgba(220, 53, 69, 0.3);
+        color: #f8d7da;
+    }
+
+    .alert-danger.custom-alert i {
+        color: #dc3545;
+    }
+
+    .alert-success.custom-alert {
+        background: rgba(29, 185, 84, 0.1);
+        border-color: rgba(29, 185, 84, 0.3);
+        color: #d4edda;
+    }
+
+    .alert-success.custom-alert i {
+        color: #1DB954;
+    }
+
+    .table-dark {
+        background-color: #1e1e1e;
+    }
+
+    .table-dark th {
+        border-color: #404040;
+        color: #1DB954;
+    }
+
+    .table-dark td {
+        border-color: #404040;
+    }
+
+    @@media (max-width: 768px) {
+        .data-container {
+            padding: 1rem 0;
+        }
+        
+        .card-body {
+            padding: 1.5rem;
+        }
+        
+        .btn-lg {
+            width: 100%;
+            margin-bottom: 1rem;
+        }
+        
+        .explore-actions .btn-lg {
+            width: auto;
+            margin-bottom: 0.5rem;
+        }
+    }
+</style>
+
+@code {
+    private List<IBrowserFile>? _selectedFiles;
+    private List<UserDataFile>? _userFiles;
+    private UserStorageStats? _storageStats;
+    private bool _isLoading = true;
+    private bool _isUploading = false;
+    private string? _errorMessage;
+    private string? _successMessage;
+    private bool _hasData = false;
+    private string _currentUserId = "";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Check if user is authenticated
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            if (authState.User.Identity?.IsAuthenticated != true)
+            {
+                Navigation.NavigateTo("/login");
+                return;
+            }
+
+            // Get user ID from authentication
+            _currentUserId = authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "demo-user";
+            
+            await LoadUserFiles();
+        }
+    }
+
+    private async Task LoadUserFiles()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            _userFiles = await UserDataService.GetUserFilesAsync(_currentUserId);
+            _storageStats = await UserDataService.GetUserStorageStatsAsync(_currentUserId);
+            _hasData = _userFiles?.Any() == true;
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error loading files: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void OnFilesSelected(InputFileChangeEventArgs e)
+    {
+        _selectedFiles = e.GetMultipleFiles().ToList();
+        _errorMessage = null;
+        _successMessage = null;
+        StateHasChanged();
+    }
+
+    private async Task UploadFiles()
+    {
+        if (_selectedFiles?.Any() != true) return;
+
+        _isUploading = true;
+        _errorMessage = null;
+        _successMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            foreach (var file in _selectedFiles)
+            {
+                await UserDataService.SaveSpotifyDataFileAsync(_currentUserId, file);
+            }
+
+            // Clear user cache so new data is loaded
+            StatsService.ClearUserCache(_currentUserId);
+
+            _successMessage = $"Successfully uploaded {_selectedFiles.Count} file(s)";
+            _selectedFiles = null;
+            
+            // Reload the files list
+            await LoadUserFiles();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error uploading files: {ex.Message}";
+        }
+        finally
+        {
+            _isUploading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task DeleteFile(string fileName)
+    {
+        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm", $"Are you sure you want to delete '{fileName}'?");
+        if (!confirmed) return;
+
+        try
+        {
+            await UserDataService.DeleteUserFileAsync(_currentUserId, fileName);
+            
+            // Clear user cache
+            StatsService.ClearUserCache(_currentUserId);
+            
+            _successMessage = $"File '{fileName}' deleted successfully";
+            
+            // Reload the files list
+            await LoadUserFiles();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error deleting file: {ex.Message}";
+            StateHasChanged();
+        }
+    }
+
+    private static string FormatFileSize(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB" };
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len = len / 1024;
+        }
+        return $"{len:0.##} {sizes[order]}";
+    }
+} 

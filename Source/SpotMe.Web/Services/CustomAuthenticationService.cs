@@ -106,18 +106,47 @@ public class CustomAuthenticationService
         }
         else
         {
-            // Try to load from cookie if HTTP context doesn't have user (fire-and-forget)
-            _ = Task.Run(async () =>
+            // Try to load from HTTP context cookies first (works during static rendering)
+            LoadUserFromHttpContextCookies();
+        }
+    }
+
+    private void LoadUserFromHttpContextCookies()
+    {
+        try
+        {
+            var httpContext = _httpContextAccessor.HttpContext;
+            if (httpContext?.Request?.Cookies != null && httpContext.Request.Cookies.TryGetValue("SpotMe.Auth", out var cookieValue))
             {
-                try
+                
+                if (!string.IsNullOrEmpty(cookieValue))
                 {
-                    await LoadUserFromCookieAsync();
+                    var userDataJson = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(cookieValue));
+                    var userData = JsonSerializer.Deserialize<JsonElement>(userDataJson);
+                    
+                    var claims = new[]
+                    {
+                        new Claim(ClaimTypes.Name, userData.GetProperty("Email").GetString() ?? ""),
+                        new Claim(ClaimTypes.Email, userData.GetProperty("Email").GetString() ?? ""),
+                        new Claim(ClaimTypes.NameIdentifier, userData.GetProperty("UserId").GetString() ?? "")
+                    };
+
+                    var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+                    CurrentUser = new ClaimsPrincipal(identity);
                 }
-                catch
+                else
                 {
-                    // Ignore errors in background loading
+                    CurrentUser = new ClaimsPrincipal(new ClaimsIdentity());
                 }
-            });
+            }
+            else
+            {
+                CurrentUser = new ClaimsPrincipal(new ClaimsIdentity());
+            }
+        }
+        catch
+        {
+            CurrentUser = new ClaimsPrincipal(new ClaimsIdentity());
         }
     }
 
@@ -147,10 +176,9 @@ public class CustomAuthenticationService
                 CurrentUser = new ClaimsPrincipal(new ClaimsIdentity());
             }
         }
-        catch (Exception ex)
+        catch
         {
             // If there's any error loading from cookie, just set anonymous user
-            Console.WriteLine($"LoadUserFromCookie error: {ex.Message}");
             CurrentUser = new ClaimsPrincipal(new ClaimsIdentity());
         }
     }
@@ -160,7 +188,7 @@ public class CustomAuthenticationService
         // Initialize authentication state when the service is first used
         LoadUserFromHttpContext();
         
-        // If no HTTP context user, try loading from cookie
+        // If still not authenticated and JavaScript is available, try loading from JavaScript cookies
         if (CurrentUser.Identity?.IsAuthenticated != true)
         {
             try
@@ -169,7 +197,7 @@ public class CustomAuthenticationService
             }
             catch
             {
-                // Ignore errors during initialization
+                // Ignore errors during initialization (likely prerendering)
             }
         }
     }

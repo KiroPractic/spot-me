@@ -5,32 +5,57 @@ namespace SpotMe.Web.Services;
 
 public class CustomAuthenticationStateProvider : AuthenticationStateProvider
 {
-    private AuthenticationState authenticationState;
+    private readonly CustomAuthenticationService _service;
+    private readonly TaskCompletionSource<AuthenticationState> _authenticationState;
 
     public CustomAuthenticationStateProvider(CustomAuthenticationService service)
     {
-        authenticationState = new AuthenticationState(service.CurrentUser);
+        _service = service;
+        _authenticationState = new TaskCompletionSource<AuthenticationState>();
 
         service.UserChanged += (newUser) =>
         {
-            authenticationState = new AuthenticationState(newUser);
-            NotifyAuthenticationStateChanged(Task.FromResult(authenticationState));
+            var newAuthState = new AuthenticationState(newUser);
+            if (_authenticationState.Task.IsCompleted)
+            {
+                NotifyAuthenticationStateChanged(Task.FromResult(newAuthState));
+            }
+            else
+            {
+                _authenticationState.SetResult(newAuthState);
+            }
         };
 
-        // Initialize the service to load from cookies if needed
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                await service.InitializeAsync();
-            }
-            catch
-            {
-                // Ignore initialization errors
-            }
-        });
+        // Initialize immediately and synchronously if possible
+        _ = InitializeAsync();
     }
 
-    public override Task<AuthenticationState> GetAuthenticationStateAsync() =>
-        Task.FromResult(authenticationState);
+    private async Task InitializeAsync()
+    {
+        try
+        {
+            // Try to initialize the service
+            await _service.InitializeAsync();
+            
+            // Set the initial authentication state
+            if (!_authenticationState.Task.IsCompleted)
+            {
+                _authenticationState.SetResult(new AuthenticationState(_service.CurrentUser));
+            }
+        }
+        catch
+        {
+            // If initialization fails, set anonymous user
+            if (!_authenticationState.Task.IsCompleted)
+            {
+                _authenticationState.SetResult(new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity())));
+            }
+        }
+    }
+
+    public override async Task<AuthenticationState> GetAuthenticationStateAsync()
+    {
+        // Wait for initialization to complete
+        return await _authenticationState.Task;
+    }
 } 

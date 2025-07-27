@@ -22,13 +22,9 @@
         
         @if (_isAuthenticated)
         {
-            <a href="/instructions" class="@GetActiveClass("/instructions")">
-                <i class="bi bi-info-circle"></i>
-                <span>Instructions</span>
-            </a>
-            <a href="/userdata" class="@GetActiveClass("/userdata")">
-                <i class="bi bi-file-earmark-arrow-up"></i>
-                <span>Upload Data</span>
+            <a href="/data" class="@GetActiveClass("/data")">
+                <i class="bi bi-database"></i>
+                <span>My Data</span>
             </a>
             <a href="/stats" class="@GetActiveClass("/stats")">
                 <i class="bi bi-graph-up"></i>
