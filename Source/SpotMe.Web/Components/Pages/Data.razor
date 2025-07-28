@@ -118,9 +118,17 @@
                         <p class="card-text mb-4">Upload your Spotify streaming history JSON files downloaded from Spotify.</p>
                         
                         <div class="mb-3">
-                            <label for="fileInput" class="form-label">Select JSON Files</label>
+                            <label for="fileInput" class="form-label">Select Spotify JSON Files</label>
                             <InputFile id="fileInput" class="form-control file-input" multiple OnChange="OnFilesSelected" accept=".json" />
-                            <div class="form-text">You can select multiple JSON files at once. Only .json files are accepted.</div>
+                            <div class="form-text">
+                                <strong>File Requirements:</strong>
+                                <ul class="mb-0 mt-1">
+                                    <li>Must be .json files containing Spotify streaming history</li>
+                                    <li>Files should be named like: <code>Streaming_History_Audio_YYYY-YYYY_X.json</code></li>
+                                    <li>Maximum file size: 100MB per file</li>
+                                    <li>Files must contain an array of streaming entries with artist/track data</li>
+                                </ul>
+                            </div>
                         </div>
 
                         @if (_selectedFiles?.Any() == true)
@@ -772,9 +780,66 @@
 
     private void OnFilesSelected(InputFileChangeEventArgs e)
     {
-        _selectedFiles = e.GetMultipleFiles().ToList();
+        _selectedFiles = new List<IBrowserFile>();
+        var warnings = new List<string>();
+        var errors = new List<string>();
+        const long maxFileSize = 100 * 1024 * 1024; // 100MB
+
+        foreach (var file in e.GetMultipleFiles())
+        {
+            // Validate file extension
+            if (!file.Name.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+            {
+                errors.Add($"{file.Name}: Must be a .json file");
+                continue;
+            }
+
+            // Validate file size
+            if (file.Size > maxFileSize)
+            {
+                errors.Add($"{file.Name}: File size ({FormatFileSize(file.Size)}) exceeds 100MB limit");
+                continue;
+            }
+
+            if (file.Size == 0)
+            {
+                errors.Add($"{file.Name}: File appears to be empty");
+                continue;
+            }
+
+            // Check filename format (warning, not error)
+            if (!file.Name.Contains("Streaming_History", StringComparison.OrdinalIgnoreCase) &&
+                !file.Name.Contains("streaming", StringComparison.OrdinalIgnoreCase) &&
+                !file.Name.Contains("spotify", StringComparison.OrdinalIgnoreCase))
+            {
+                warnings.Add($"{file.Name}: Filename doesn't match typical Spotify format");
+            }
+
+            _selectedFiles.Add(file);
+        }
+
+        // Set messages
         _errorMessage = null;
         _successMessage = null;
+
+        if (errors.Any())
+        {
+            _errorMessage = $"Some files were rejected: {string.Join("; ", errors)}";
+        }
+
+        if (warnings.Any())
+        {
+            var warningMessage = $"Warnings: {string.Join("; ", warnings)}";
+            if (_errorMessage != null)
+            {
+                _errorMessage += $" {warningMessage}";
+            }
+            else
+            {
+                _errorMessage = warningMessage;
+            }
+        }
+
         StateHasChanged();
     }
 
@@ -787,31 +852,63 @@
         _successMessage = null;
         StateHasChanged();
 
-        try
+        var uploadResults = new List<(string fileName, bool success, string message)>();
+        var successCount = 0;
+
+        foreach (var file in _selectedFiles)
         {
-            foreach (var file in _selectedFiles)
+            try
             {
                 await UserDataService.SaveSpotifyDataFileAsync(_currentUserId, file);
+                uploadResults.Add((file.Name, true, "Successfully uploaded"));
+                successCount++;
             }
+            catch (Exception ex)
+            {
+                uploadResults.Add((file.Name, false, ex.Message));
+            }
+        }
 
-            // Clear user cache so new data is loaded
+        // Clear user cache if any files were uploaded successfully
+        if (successCount > 0)
+        {
             StatsService.ClearUserCache(_currentUserId);
+        }
 
-            _successMessage = $"Successfully uploaded {_selectedFiles.Count} file(s)";
-            _selectedFiles = null;
-            
-            // Reload the files list
+        // Create detailed feedback message
+        if (successCount == _selectedFiles.Count)
+        {
+            _successMessage = $"Successfully uploaded all {successCount} file(s)";
+        }
+        else if (successCount > 0)
+        {
+            var failedCount = _selectedFiles.Count - successCount;
+            _successMessage = $"Successfully uploaded {successCount} file(s)";
+            _errorMessage = $"Failed to upload {failedCount} file(s). See details below.";
+        }
+        else
+        {
+            _errorMessage = "Failed to upload any files. Please check the file format and try again.";
+        }
+
+        // Add detailed results to the message
+        if (uploadResults.Any(r => !r.success))
+        {
+            var failedFiles = uploadResults.Where(r => !r.success);
+            var detailedErrors = string.Join("; ", failedFiles.Select(f => $"{f.fileName}: {f.message}"));
+            _errorMessage = _errorMessage + $" Details: {detailedErrors}";
+        }
+
+        _selectedFiles = null;
+        
+        // Reload the files list if any uploads succeeded
+        if (successCount > 0)
+        {
             await LoadUserFiles();
         }
-        catch (Exception ex)
-        {
-            _errorMessage = $"Error uploading files: {ex.Message}";
-        }
-        finally
-        {
-            _isUploading = false;
-            StateHasChanged();
-        }
+
+        _isUploading = false;
+        StateHasChanged();
     }
 
     private async Task DeleteFile(string fileName)

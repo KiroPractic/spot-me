@@ -53,8 +53,26 @@ services:
         condition: service_healthy
     command: dotnet watch run --project SpotMe.Web/SpotMe.Web.csproj --urls http://0.0.0.0:8080
 
+  # File Browser - Web UI to browse uploaded files
+  filebrowser:
+    image: filebrowser/filebrowser:latest
+    container_name: spotme-filebrowser
+    ports:
+      - "8081:80"
+    volumes:
+      - user_data:/srv/UserData:ro          # Read-only access to user uploads
+      - spotify_data:/srv/SpotifyStats:ro   # Read-only access to default data
+      - filebrowser_data:/database          # File browser database
+    environment:
+      - FB_BASEURL=/
+      - FB_USERNAME=admin
+      - FB_PASSWORD=admin
+      - FB_NOAUTH=false
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   smtp4dev_data:
   spotify_data:
   user_data:
+  filebrowser_data:

@@ -25,8 +25,28 @@ html, body {
     padding: 0;
     height: 100%;
     width: 100%;
-    color: var(--text-primary);
-    background-color: var(--dark-bg);
+    color: var(--text-primary) !important;
+    background-color: var(--dark-bg) !important;
+}
+
+/* Force light text on all elements */
+* {
+    color: inherit;
+}
+
+/* Ensure all text elements use light colors */
+p, span, div, h1, h2, h3, h4, h5, h6, li, td, th, label {
+    color: var(--text-primary) !important;
+}
+
+/* Muted text elements */
+.text-muted, .form-text, small {
+    color: var(--text-secondary) !important;
+}
+
+/* Lead text */
+.lead {
+    color: var(--text-secondary) !important;
 }
 
 ::selection {
@@ -472,7 +492,98 @@ input.dark-input[type="date"]::-webkit-calendar-picker-indicator:hover {
 /* Form labels */
 .form-label,
 label {
-    color: #b3b3b3;
+    color: var(--text-secondary) !important;
+}
+
+/* Bootstrap overrides for dark theme */
+.container, .container-fluid {
+    color: var(--text-primary) !important;
+}
+
+.card {
+    background-color: var(--dark-card) !important;
+    border-color: var(--dark-border) !important;
+    color: var(--text-primary) !important;
+}
+
+.card-header {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    border-color: var(--dark-border) !important;
+    color: var(--text-primary) !important;
+}
+
+.card-body {
+    color: var(--text-primary) !important;
+}
+
+.card-title {
+    color: var(--text-primary) !important;
+}
+
+.card-text {
+    color: var(--text-secondary) !important;
+}
+
+.list-group-item {
+    background-color: var(--dark-card) !important;
+    border-color: var(--dark-border) !important;
+    color: var(--text-primary) !important;
+}
+
+.list-group-flush .list-group-item {
+    background-color: transparent !important;
+    color: var(--text-primary) !important;
+}
+
+.badge {
+    color: var(--text-primary) !important;
+}
+
+.alert {
+    color: var(--text-primary) !important;
+}
+
+.alert-danger {
+    background-color: rgba(220, 53, 69, 0.2) !important;
+    border-color: rgba(220, 53, 69, 0.4) !important;
+    color: #ff6b8a !important;
+}
+
+.alert-success {
+    background-color: rgba(25, 135, 84, 0.2) !important;
+    border-color: rgba(25, 135, 84, 0.4) !important;
+    color: #4ade80 !important;
+}
+
+.btn {
+    color: var(--text-primary) !important;
+}
+
+.btn-primary {
+    background-color: var(--spotify-green) !important;
+    border-color: var(--spotify-green) !important;
+    color: white !important;
+}
+
+.btn-primary:hover {
+    background-color: var(--spotify-green-hover) !important;
+    border-color: var(--spotify-green-hover) !important;
+    color: white !important;
+}
+
+/* Ensure table text is visible */
+.table {
+    color: var(--text-primary) !important;
+}
+
+.table th {
+    color: var(--text-primary) !important;
+    border-color: var(--dark-border) !important;
+}
+
+.table td {
+    color: var(--text-primary) !important;
+    border-color: var(--dark-border) !important;
 }
 
 /* Override Bootstrap's default focus colors globally */
@@ -508,6 +619,63 @@ body {
 /* Try to force dark mode on date inputs */
 input[type="date"] {
     color-scheme: dark;
+}
+
+/* Global text color enforcement - catch any remaining dark text */
+.text-dark {
+    color: var(--text-primary) !important;
+}
+
+.text-black {
+    color: var(--text-primary) !important;
+}
+
+/* Ensure all Bootstrap typography uses light colors */
+.display-1, .display-2, .display-3, .display-4, .display-5, .display-6 {
+    color: var(--text-primary) !important;
+}
+
+.text-body {
+    color: var(--text-primary) !important;
+}
+
+/* Additional Bootstrap component overrides */
+.dropdown-menu {
+    background-color: var(--dark-card) !important;
+    border-color: var(--dark-border) !important;
+}
+
+.dropdown-item {
+    color: var(--text-primary) !important;
+}
+
+.dropdown-item:hover, .dropdown-item:focus {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    color: var(--text-primary) !important;
+}
+
+.modal-content {
+    background-color: var(--dark-card) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--dark-border) !important;
+}
+
+.modal-header {
+    border-color: var(--dark-border) !important;
+    color: var(--text-primary) !important;
+}
+
+.modal-body {
+    color: var(--text-primary) !important;
+}
+
+.modal-footer {
+    border-color: var(--dark-border) !important;
+}
+
+/* Force any remaining text to be light */
+.container *, .container-fluid *, .card *, .row *, .col * {
+    color: inherit !important;
 }
 
 /* Attempt to style calendar popup (browser-dependent) */
@@ -893,6 +1061,168 @@ input[type="date"]::-moz-calendar-picker-indicator {
 /* Add padding to the bottom of the page when player is visible */
 .app-layout {
     padding-bottom: 80px;
+}
+
+/* Data Page Specific Styles */
+.data-container {
+    color: var(--text-primary) !important;
+}
+
+.welcome-header h1 {
+    color: var(--spotify-green) !important;
+}
+
+.welcome-header p {
+    color: var(--text-secondary) !important;
+}
+
+.instruction-card {
+    background-color: var(--dark-card) !important;
+    border: 1px solid var(--dark-border) !important;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+}
+
+.instruction-card .card-header {
+    background-color: var(--spotify-green) !important;
+    color: white !important;
+    padding: 1rem;
+}
+
+.instruction-card .card-body {
+    background-color: var(--dark-card) !important;
+    color: var(--text-primary) !important;
+    padding: 1.5rem;
+}
+
+.instruction-list {
+    color: var(--text-primary) !important;
+    margin-bottom: 0;
+}
+
+.instruction-list li {
+    color: var(--text-primary) !important;
+    margin-bottom: 1rem;
+}
+
+.instruction-list li strong {
+    color: var(--text-primary) !important;
+}
+
+.upload-card {
+    background-color: var(--dark-card) !important;
+    border: 1px solid var(--dark-border) !important;
+    color: var(--text-primary) !important;
+}
+
+.upload-card .card-header {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    border-bottom: 1px solid var(--dark-border) !important;
+    color: var(--text-primary) !important;
+}
+
+.upload-card .card-title {
+    color: var(--text-primary) !important;
+    margin: 0;
+}
+
+.upload-card .card-body {
+    background-color: var(--dark-card) !important;
+    color: var(--text-primary) !important;
+}
+
+.upload-card .card-text {
+    color: var(--text-secondary) !important;
+}
+
+.file-input {
+    background-color: var(--dark-input) !important;
+    border: 1px solid var(--dark-border) !important;
+    color: var(--text-primary) !important;
+}
+
+.file-input:focus {
+    background-color: var(--dark-input) !important;
+    border-color: var(--spotify-green) !important;
+    color: var(--text-primary) !important;
+    box-shadow: 0 0 0 0.2rem var(--spotify-green-focus) !important;
+}
+
+.btn-upload {
+    background-color: var(--spotify-green) !important;
+    border-color: var(--spotify-green) !important;
+    color: white !important;
+}
+
+.btn-upload:hover {
+    background-color: var(--spotify-green-hover) !important;
+    border-color: var(--spotify-green-hover) !important;
+    color: white !important;
+}
+
+.btn-upload:disabled {
+    background-color: #555 !important;
+    border-color: #555 !important;
+    color: #999 !important;
+}
+
+.custom-alert {
+    border-radius: 6px;
+    margin-bottom: 1rem;
+}
+
+.custom-alert i {
+    color: inherit !important;
+}
+
+.custom-alert strong {
+    color: inherit !important;
+}
+
+/* File list styling */
+.files-section {
+    color: var(--text-primary) !important;
+}
+
+.files-section h2 {
+    color: var(--text-primary) !important;
+}
+
+.file-item {
+    background-color: var(--dark-card) !important;
+    border: 1px solid var(--dark-border) !important;
+    border-radius: 6px;
+    padding: 1rem;
+    margin-bottom: 0.5rem;
+    color: var(--text-primary) !important;
+}
+
+.file-name {
+    color: var(--text-primary) !important;
+    font-weight: 600;
+}
+
+.file-meta {
+    color: var(--text-secondary) !important;
+    font-size: 0.9rem;
+}
+
+.file-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn-danger {
+    background-color: rgba(220, 53, 69, 0.8) !important;
+    border-color: rgba(220, 53, 69, 0.8) !important;
+    color: white !important;
+}
+
+.btn-danger:hover {
+    background-color: rgba(220, 53, 69, 1) !important;
+    border-color: rgba(220, 53, 69, 1) !important;
+    color: white !important;
 }
 
 /* Responsive Adjustments */
