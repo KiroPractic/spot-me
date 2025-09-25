@@ -746,7 +746,7 @@ public class StatsService
             return cachedEntries;
 
         // Load from user data service
-        var entries = await _userDataService.LoadUserStreamingHistoryAsync(userId);
+        var entries = await _userDataService.LoadUserStreamingHistoryAsync();
         
         // Cache the results
         _userEntries[userId] = entries;

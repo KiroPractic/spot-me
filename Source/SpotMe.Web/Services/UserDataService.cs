@@ -1,6 +1,9 @@
 using SpotMe.Web.Models;
 using System.Text.Json;
 using Microsoft.AspNetCore.Components.Forms;
+using SpotMe.Web.Domain.Users;
+using SpotMe.Web.Persistency;
+using Microsoft.EntityFrameworkCore;
 
 namespace SpotMe.Web.Services;
 
@@ -8,11 +11,39 @@ public class UserDataService
 {
     private readonly IWebHostEnvironment _environment;
     private readonly ILogger<UserDataService> _logger;
+    private readonly DatabaseContext _context;
+    private readonly CustomAuthenticationService _authService;
 
-    public UserDataService(IWebHostEnvironment environment, ILogger<UserDataService> logger)
+    public UserDataService(
+        IWebHostEnvironment environment, 
+        ILogger<UserDataService> logger, 
+        DatabaseContext context,
+        CustomAuthenticationService authService)
     {
         _environment = environment;
         _logger = logger;
+        _context = context;
+        _authService = authService;
+    }
+
+    /// <summary>
+    /// Get the current authenticated user ID
+    /// </summary>
+    private string GetCurrentUserId()
+    {
+        var user = _authService.CurrentUser;
+        if (!user.Identity?.IsAuthenticated == true)
+        {
+            throw new UnauthorizedAccessException("User is not authenticated");
+        }
+
+        var userId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userId))
+        {
+            throw new UnauthorizedAccessException("User ID not found in claims");
+        }
+
+        return userId;
     }
 
     /// <summary>
@@ -24,25 +55,52 @@ public class UserDataService
     }
 
     /// <summary>
-    /// Get user-specific data directory path
+    /// Get user-specific data directory path for current user
     /// </summary>
-    public string GetUserDataPath(string userId)
+    public string GetUserDataPath()
+    {
+        var userId = GetCurrentUserId();
+        return Path.Combine(GetUserDataBasePath(), userId);
+    }
+
+    /// <summary>
+    /// Get user-specific data directory path for specific user (internal use)
+    /// </summary>
+    private string GetUserDataPath(string userId)
     {
         return Path.Combine(GetUserDataBasePath(), userId);
     }
 
     /// <summary>
-    /// Get user-specific Spotify data directory path
+    /// Get user-specific Spotify data directory path for current user
     /// </summary>
-    public string GetUserSpotifyDataPath(string userId)
+    public string GetUserSpotifyDataPath()
+    {
+        var userId = GetCurrentUserId();
+        return Path.Combine(GetUserDataPath(userId), "SpotifyStats");
+    }
+
+    /// <summary>
+    /// Get user-specific Spotify data directory path for specific user (internal use)
+    /// </summary>
+    private string GetUserSpotifyDataPath(string userId)
     {
         return Path.Combine(GetUserDataPath(userId), "SpotifyStats");
     }
 
     /// <summary>
-    /// Ensure user directory structure exists
+    /// Ensure user directory structure exists for current user
     /// </summary>
-    public async Task EnsureUserDirectoryExistsAsync(string userId)
+    public void EnsureUserDirectoryExists()
+    {
+        var userId = GetCurrentUserId();
+        EnsureUserDirectoryExists(userId);
+    }
+
+    /// <summary>
+    /// Ensure user directory structure exists for specific user (internal use)
+    /// </summary>
+    private void EnsureUserDirectoryExists(string userId)
     {
         var userPath = GetUserDataPath(userId);
         var spotifyPath = GetUserSpotifyDataPath(userId);
@@ -61,11 +119,12 @@ public class UserDataService
     }
 
     /// <summary>
-    /// Save user's Spotify streaming history JSON file
+    /// Save user's Spotify streaming history JSON file for current user
     /// </summary>
-    public async Task SaveSpotifyDataFileAsync(string userId, string fileName, string jsonContent)
+    public async Task SaveSpotifyDataFileAsync(string fileName, string jsonContent)
     {
-        await EnsureUserDirectoryExistsAsync(userId);
+        var userId = GetCurrentUserId();
+        EnsureUserDirectoryExists(userId);
         
         var filePath = Path.Combine(GetUserSpotifyDataPath(userId), fileName);
         
@@ -84,17 +143,19 @@ public class UserDataService
     }
 
     /// <summary>
-    /// Save user's Spotify streaming history from uploaded file
+    /// Save user's Spotify streaming history from uploaded file for current user
     /// </summary>
-    public async Task SaveSpotifyDataFileAsync(string userId, IFormFile file)
+    public async Task SaveSpotifyDataFileAsync(IFormFile file)
     {
+        var userId = GetCurrentUserId();
+        
         if (file == null || file.Length == 0)
             throw new ArgumentException("File is empty", nameof(file));
 
         if (!file.FileName.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
             throw new ArgumentException("File must be a JSON file", nameof(file));
 
-        await EnsureUserDirectoryExistsAsync(userId);
+        EnsureUserDirectoryExists(userId);
 
         var filePath = Path.Combine(GetUserSpotifyDataPath(userId), file.FileName);
 
@@ -187,10 +248,12 @@ public class UserDataService
     }
 
     /// <summary>
-    /// Save a Spotify data file uploaded via browser with enhanced validation
+    /// Save a Spotify data file uploaded via browser with enhanced validation and database tracking
     /// </summary>
-    public async Task SaveSpotifyDataFileAsync(string userId, IBrowserFile file)
+    public async Task SaveSpotifyDataFileAsync(IBrowserFile file)
     {
+        var userId = GetCurrentUserId();
+        
         if (file == null || file.Size == 0)
             throw new ArgumentException("File is empty", nameof(file));
 
@@ -202,7 +265,7 @@ public class UserDataService
         if (file.Size > maxFileSize)
             throw new ArgumentException($"File size ({FormatFileSize(file.Size)}) exceeds maximum allowed size ({FormatFileSize(maxFileSize)})", nameof(file));
 
-        await EnsureUserDirectoryExistsAsync(userId);
+        EnsureUserDirectoryExists(userId);
 
         // Read the file content once to avoid seeking issues
         byte[] fileContent;
@@ -229,19 +292,36 @@ public class UserDataService
         
         // Check if file already exists and create unique name if needed
         var finalFilePath = GetUniqueFilePath(filePath);
+        var finalFileName = Path.GetFileName(finalFilePath);
         
         // Write the content to file
         await File.WriteAllBytesAsync(finalFilePath, fileContent);
 
+        // Save file reference to database
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Id.ToString() == userId);
+        if (user != null)
+        {
+            var relativePath = Path.GetRelativePath(_environment.ContentRootPath, finalFilePath);
+            user.AddFile(
+                originalFileName: finalFileName,
+                extension: Path.GetExtension(finalFileName),
+                contentType: "application/json",
+                link: relativePath
+            );
+            
+            await _context.SaveChangesAsync();
+        }
+
         _logger.LogInformation("Uploaded Spotify data file for user {UserId}: {FileName} ({Size} bytes)", 
-            userId, Path.GetFileName(finalFilePath), file.Size);
+            userId, finalFileName, file.Size);
     }
 
     /// <summary>
-    /// Load all streaming history for a specific user
+    /// Load all streaming history for current user
     /// </summary>
-    public async Task<List<StreamingHistoryEntry>> LoadUserStreamingHistoryAsync(string userId)
+    public async Task<List<StreamingHistoryEntry>> LoadUserStreamingHistoryAsync()
     {
+        var userId = GetCurrentUserId();
         var spotifyPath = GetUserSpotifyDataPath(userId);
         
         if (!Directory.Exists(spotifyPath))
@@ -283,10 +363,11 @@ public class UserDataService
     }
 
     /// <summary>
-    /// Get list of uploaded files for a user
+    /// Get list of files for current user
     /// </summary>
-    public async Task<List<UserDataFile>> GetUserFilesAsync(string userId)
+    public async Task<List<UserDataFile>> GetUserFilesAsync()
     {
+        var userId = GetCurrentUserId();
         var spotifyPath = GetUserSpotifyDataPath(userId);
         
         if (!Directory.Exists(spotifyPath))
@@ -331,10 +412,11 @@ public class UserDataService
     }
 
     /// <summary>
-    /// Delete a user's data file
+    /// Delete a user's data file for current user
     /// </summary>
-    public async Task DeleteUserFileAsync(string userId, string fileName)
+    public async Task DeleteUserFileAsync(string fileName)
     {
+        var userId = GetCurrentUserId();
         var filePath = Path.Combine(GetUserSpotifyDataPath(userId), fileName);
         
         if (File.Exists(filePath))
@@ -342,13 +424,22 @@ public class UserDataService
             File.Delete(filePath);
             _logger.LogInformation("Deleted file {FileName} for user {UserId}", fileName, userId);
         }
+
+        // Remove file reference from database
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Id.ToString() == userId);
+        if (user != null)
+        {
+            user.RemoveFileByName(fileName);
+            await _context.SaveChangesAsync();
+        }
     }
 
     /// <summary>
-    /// Get storage statistics for a user
+    /// Get storage statistics for current user
     /// </summary>
-    public async Task<UserStorageStats> GetUserStorageStatsAsync(string userId)
+    public async Task<UserStorageStats> GetUserStorageStatsAsync()
     {
+        var userId = GetCurrentUserId();
         var spotifyPath = GetUserSpotifyDataPath(userId);
         
         if (!Directory.Exists(spotifyPath))

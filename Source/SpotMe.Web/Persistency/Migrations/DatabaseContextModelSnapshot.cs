@@ -28,7 +28,7 @@ namespace SpotMe.Web.Persistency.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime>("CreatedOn")
+                    b.Property<DateTimeOffset>("CreatedOn")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("EmailAddress")
@@ -47,6 +47,68 @@ namespace SpotMe.Web.Persistency.Migrations
                         .IsUnique();
 
                     b.ToTable("Users");
+                });
+
+            modelBuilder.Entity("SpotMe.Web.Domain.Users.User", b =>
+                {
+                    b.OwnsMany("SpotMe.Web.Domain.Users.FileInformation", "Files", b1 =>
+                        {
+                            b1.Property<Guid>("UserId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<Guid>("Id")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("uuid");
+
+                            b1.Property<string>("ContentType")
+                                .IsRequired()
+                                .HasMaxLength(100)
+                                .HasColumnType("character varying(100)");
+
+                            b1.Property<DateTimeOffset>("CreatedOn")
+                                .HasColumnType("timestamp with time zone");
+
+                            b1.Property<string>("Description")
+                                .HasMaxLength(1000)
+                                .HasColumnType("character varying(1000)");
+
+                            b1.Property<string>("Extension")
+                                .IsRequired()
+                                .HasMaxLength(50)
+                                .HasColumnType("character varying(50)");
+
+                            b1.Property<string>("Link")
+                                .IsRequired()
+                                .HasMaxLength(500)
+                                .HasColumnType("character varying(500)");
+
+                            b1.Property<Guid>("ObjectId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<string>("OriginalFileName")
+                                .IsRequired()
+                                .HasMaxLength(255)
+                                .HasColumnType("character varying(255)");
+
+                            b1.Property<string>("Title")
+                                .HasMaxLength(255)
+                                .HasColumnType("character varying(255)");
+
+                            b1.Property<DateTimeOffset>("UpdatedOn")
+                                .HasColumnType("timestamp with time zone");
+
+                            b1.HasKey("UserId", "Id");
+
+                            b1.HasIndex("ObjectId")
+                                .IsUnique();
+
+                            b1.ToTable("UserFiles", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("UserId");
+                        });
+
+                    b.Navigation("Files");
                 });
 #pragma warning restore 612, 618
         }
