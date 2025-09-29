@@ -3,5 +3,5 @@
 public class Entity
 {
     public Guid Id { get; private set; } = Guid.NewGuid();
-    public DateTimeOffset CreatedOn { get; private set; } = DateTimeOffset.UtcNow;
+    public DateTime CreatedOn { get; private set; } = DateTime.UtcNow;
 }

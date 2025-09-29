@@ -71,8 +71,9 @@ builder.Services.AddScoped<SpotifyService>(sp =>
     )
 );
 
-// Register Stats service
-builder.Services.AddScoped<StatsService>();
+// Register Stats services
+builder.Services.AddScoped<DatabaseStatsService>(); // Database-based stats service
+builder.Services.AddScoped<StreamingHistoryImportService>();
 
 // Register User Data service
 builder.Services.AddScoped<UserDataService>();

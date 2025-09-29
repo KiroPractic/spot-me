@@ -86,7 +86,10 @@ public class StreamingHistoryEntry
     public bool? IncognitoMode { get; set; }
 
     // Use Timestamp for all date logic
-    public DateTime StartDateTime => !string.IsNullOrEmpty(Timestamp) ? DateTime.Parse(Timestamp, null, System.Globalization.DateTimeStyles.RoundtripKind) : DateTime.MinValue;
+    // Note: Despite the 'Z' suffix, Spotify appears to store local times in UTC format
+    public DateTime StartDateTime => !string.IsNullOrEmpty(Timestamp) ? 
+        DateTime.Parse(Timestamp, null, System.Globalization.DateTimeStyles.RoundtripKind) : 
+        DateTime.MinValue;
     
     public TimeSpan Duration => TimeSpan.FromMilliseconds(MsPlayed);
     public double MinutesPlayed => Duration.TotalMinutes;
@@ -141,6 +144,7 @@ public enum ContentType
 
 public enum PlaybackCompletionStatus
 {
+    Unknown,
     Skipped,
     BarelyPlayed,
     PartiallyCompleted,
