@@ -806,9 +806,24 @@ input[type="date"] {
     border-color: var(--dark-border) !important;
 }
 
-/* Force any remaining text to be light */
-.container *, .container-fluid *, .card *, .row *, .col * {
-    color: inherit !important;
+/* Removed overly broad text color rule that was affecting all elements */
+
+/* Specific styling for upload database button */
+.upload-database-btn {
+    color: white !important;
+}
+
+/* File remove button styling */
+.file-remove-btn {
+    color: #dc3545 !important; /* Bootstrap danger color for the icon */
+    border-color: #dc3545 !important;
+    background-color: transparent !important;
+}
+
+.file-remove-btn:hover {
+    color: white !important;
+    background-color: #dc3545 !important;
+    border-color: #dc3545 !important;
 }
 
 /* Attempt to style calendar popup (browser-dependent) */
