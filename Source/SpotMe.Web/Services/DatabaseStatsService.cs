@@ -63,17 +63,27 @@ public class DatabaseStatsService
         var actualEndDate = dateRange.MaxDate;
         var daysInRange = (actualEndDate - actualStartDate).Days + 1;
 
-        // Basic stats - single query with multiple aggregations
+        // Basic stats - simplified queries to avoid PostgreSQL syntax issues
         var basicStats = await query
             .GroupBy(x => 1)
             .Select(g => new {
                 TotalTracks = g.Count(),
-                TotalMinutes = g.Sum(x => x.MsPlayed) / 60000.0,
-                UniqueArtists = g.Where(x => x.ArtistName != null).Select(x => x.ArtistName).Distinct().Count(),
-                UniqueTracks = g.Where(x => x.TrackName != null && x.ArtistName != null)
-                               .Select(x => new { x.ArtistName, x.TrackName }).Distinct().Count()
+                TotalMinutes = g.Sum(x => x.MsPlayed) / 60000.0
             })
             .FirstAsync();
+
+        // Get unique counts separately to avoid complex nested queries
+        var uniqueArtists = await query
+            .Where(x => x.ArtistName != null)
+            .Select(x => x.ArtistName)
+            .Distinct()
+            .CountAsync();
+
+        var uniqueTracks = await query
+            .Where(x => x.TrackName != null && x.ArtistName != null)
+            .Select(x => new { x.ArtistName, x.TrackName })
+            .Distinct()
+            .CountAsync();
 
         var averageMinutesPerDay = daysInRange > 0 ? basicStats.TotalMinutes / daysInRange : 0;
 
@@ -190,10 +200,12 @@ public class DatabaseStatsService
         var monthlyStats = await query
             .GroupBy(sh => new { Year = sh.PlayedAt.Year, Month = sh.PlayedAt.Month })
             .Select(g => new { 
-                YearMonth = $"{g.Key.Year:0000}-{g.Key.Month:00}", 
+                Year = g.Key.Year,
+                Month = g.Key.Month,
                 Minutes = g.Sum(x => x.MsPlayed) / 60000.0 
             })
-            .OrderBy(x => x.YearMonth)
+            .OrderBy(x => x.Year)
+            .ThenBy(x => x.Month)
             .ToListAsync();
 
         // Create time-based stats
@@ -209,12 +221,12 @@ public class DatabaseStatsService
             }).ToList(),
             MonthlyStats = monthlyStats.Select(x => new MonthlyStats
             {
-                MonthYearLabel = x.YearMonth,
+                MonthYearLabel = $"{x.Year:0000}-{x.Month:00}",
                 TotalMinutes = x.Minutes,
                 PlayCount = 0, // Would need additional query
                 AverageMinutesPerDay = 0,
-                Month = 0,
-                Year = 0,
+                Month = x.Month,
+                Year = x.Year,
                 MonthName = ""
             }).ToList()
         };
@@ -223,8 +235,8 @@ public class DatabaseStatsService
         {
             TotalTracks = basicStats.TotalTracks,
             TotalMinutes = basicStats.TotalMinutes,
-            UniqueArtists = basicStats.UniqueArtists,
-            UniqueTracks = basicStats.UniqueTracks,
+            UniqueArtists = uniqueArtists,
+            UniqueTracks = uniqueTracks,
             AverageMinutesPerDay = averageMinutesPerDay,
             StartDate = actualStartDate,
             EndDate = actualEndDate,

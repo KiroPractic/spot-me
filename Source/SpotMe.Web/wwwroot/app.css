@@ -689,7 +689,7 @@ label {
 }
 
 .btn {
-    color: var(--text-primary) !important;
+    color: var(--text-primary);
 }
 
 .btn-primary {
@@ -754,14 +754,7 @@ input[type="date"] {
     color-scheme: dark;
 }
 
-/* Global text color enforcement - catch any remaining dark text */
-.text-dark {
-    color: var(--text-primary) !important;
-}
-
-.text-black {
-    color: var(--text-primary) !important;
-}
+/* Removed text-dark and text-black overrides - let Bootstrap handle text colors */
 
 /* Ensure all Bootstrap typography uses light colors */
 .display-1, .display-2, .display-3, .display-4, .display-5, .display-6 {
@@ -810,20 +803,48 @@ input[type="date"] {
 
 /* Specific styling for upload database button */
 .upload-database-btn {
-    color: white !important;
+    background-color: #28a745;
+    color: white;
+    border: none;
+}
+
+.upload-database-btn:hover {
+    background-color: #218838;
+    color: white;
+}
+
+/* File list item styling */
+.file-list-item {
+    background-color: transparent;
+    border: 2px solid #28a745;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    padding: 0.75rem 1.25rem;
+    color: black;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Removed .file-name class - using Bootstrap's text-dark instead */
+
+/* File input styling */
+.file-input {
+    background-color: white;
+    color: black;
 }
 
 /* File remove button styling */
 .file-remove-btn {
-    color: #dc3545 !important; /* Bootstrap danger color for the icon */
-    border-color: #dc3545 !important;
-    background-color: transparent !important;
+    color: #dc3545;
+    border-color: #dc3545;
+    background-color: transparent;
 }
 
 .file-remove-btn:hover {
-    color: white !important;
-    background-color: #dc3545 !important;
-    border-color: #dc3545 !important;
+    color: white;
+    background-color: #dc3545;
+    border-color: #dc3545;
 }
 
 /* Attempt to style calendar popup (browser-dependent) */

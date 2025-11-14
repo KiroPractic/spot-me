@@ -12,14 +12,14 @@ public class UserDataService
     private readonly CustomAuthenticationService _authService;
     private readonly IWebHostEnvironment _environment;
     private readonly ILogger<UserDataService> _logger;
-    private readonly DatabaseContext _context;
+    private readonly IServiceScopeFactory _serviceScopeFactory;
 
-    public UserDataService(CustomAuthenticationService authService, IWebHostEnvironment environment, ILogger<UserDataService> logger, DatabaseContext context)
+    public UserDataService(CustomAuthenticationService authService, IWebHostEnvironment environment, ILogger<UserDataService> logger, IServiceScopeFactory serviceScopeFactory)
     {
         _authService = authService;
         _environment = environment;
         _logger = logger;
-        _context = context;
+        _serviceScopeFactory = serviceScopeFactory;
     }
 
     /// <summary>
@@ -112,7 +112,7 @@ public class UserDataService
         {
             // Read and validate file content
             byte[] fileContent;
-            using (var stream = file.OpenReadStream(maxFileSize))
+            await using (var stream = file.OpenReadStream(maxFileSize))
             {
                 using var memoryStream = new MemoryStream();
                 await stream.CopyToAsync(memoryStream);
@@ -144,58 +144,64 @@ public class UserDataService
                 return result;
             }
 
-            // Check if user already has data
-            var existingCount = await _context.StreamingHistory
-                .Where(sh => sh.UserId == userGuid)
-                .CountAsync();
-
-            if (existingCount > 0)
+            // Use a new scope for database operations to avoid disposed context issues
+            using (var scope = _serviceScopeFactory.CreateScope())
             {
-                result.Success = true;
-                result.AlreadyExists = true;
-                result.ExistingEntryCount = existingCount;
-                result.Message = $"User already has {existingCount} entries in database";
-                return result;
-            }
+                var context = scope.ServiceProvider.GetRequiredService<DatabaseContext>();
 
-            // Convert and save to database
-            var dbEntries = new List<StreamingHistoryEntry>();
-            var batchSize = 1000;
-            var processed = 0;
+                // Check if user already has data
+                var existingCount = await context.StreamingHistory
+                    .Where(sh => sh.UserId == userGuid)
+                    .CountAsync();
 
-            foreach (var jsonEntry in jsonEntries)
-            {
-                try
+                if (existingCount > 0)
                 {
-                    var dbEntry = ConvertJsonToDbEntry(userGuid, jsonEntry);
-                    dbEntries.Add(dbEntry);
-                    processed++;
+                    result.Success = true;
+                    result.AlreadyExists = true;
+                    result.ExistingEntryCount = existingCount;
+                    result.Message = $"User already has {existingCount} entries in database";
+                    return result;
+                }
 
-                    // Batch insert for performance
-                    if (dbEntries.Count >= batchSize)
+                // Convert and save to database
+                var dbEntries = new List<StreamingHistoryEntry>();
+                var batchSize = 1000;
+                var processed = 0;
+
+                foreach (var jsonEntry in jsonEntries)
+                {
+                    try
                     {
-                        _context.StreamingHistory.AddRange(dbEntries);
-                        await _context.SaveChangesAsync();
-                        result.SavedCount += dbEntries.Count;
-                        dbEntries.Clear();
-                        
-                        _logger.LogDebug("Saved batch of {BatchSize} entries for user {UserId}. Total: {Total}", 
-                            batchSize, userId, result.SavedCount);
+                        var dbEntry = ConvertJsonToDbEntry(userGuid, jsonEntry);
+                        dbEntries.Add(dbEntry);
+                        processed++;
+
+                        // Batch insert for performance
+                        if (dbEntries.Count >= batchSize)
+                        {
+                            context.StreamingHistory.AddRange(dbEntries);
+                            await context.SaveChangesAsync();
+                            result.SavedCount += dbEntries.Count;
+                            dbEntries.Clear();
+                            
+                            _logger.LogDebug("Saved batch of {BatchSize} entries for user {UserId}. Total: {Total}", 
+                                batchSize, userId, result.SavedCount);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to convert entry {Index} for user {UserId}", processed, userId);
+                        result.ErrorCount++;
                     }
                 }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to convert entry {Index} for user {UserId}", processed, userId);
-                    result.ErrorCount++;
-                }
-            }
 
-            // Save remaining entries
-            if (dbEntries.Any())
-            {
-                _context.StreamingHistory.AddRange(dbEntries);
-                await _context.SaveChangesAsync();
-                result.SavedCount += dbEntries.Count;
+                // Save remaining entries
+                if (dbEntries.Any())
+                {
+                    context.StreamingHistory.AddRange(dbEntries);
+                    await context.SaveChangesAsync();
+                    result.SavedCount += dbEntries.Count;
+                }
             }
 
             result.Success = true;
@@ -301,8 +307,9 @@ public class UserDataService
     private StreamingHistoryEntry ConvertJsonToDbEntry(Guid userId, Models.StreamingHistoryEntry jsonEntry)
     {
         // Parse timestamp from Spotify JSON 
-        // Note: Despite the 'Z' suffix, Spotify appears to store local times in UTC format
-        var playedAt = DateTime.Parse(jsonEntry.Timestamp ?? DateTime.MinValue.ToString(), null, System.Globalization.DateTimeStyles.RoundtripKind);
+        // Convert to DateTime with Unspecified kind for PostgreSQL 'timestamp without time zone'
+        var playedAt = DateTime.Parse(jsonEntry.Timestamp ?? DateTime.MinValue.ToString(), null, System.Globalization.DateTimeStyles.None);
+        playedAt = DateTime.SpecifyKind(playedAt, DateTimeKind.Unspecified);
         
         // Determine content type
         var contentType = DetermineContentType(jsonEntry);
@@ -358,12 +365,17 @@ public class UserDataService
     {
         var userGuid = Guid.Parse(userId);
         
-        return await _context.StreamingHistory
-            .Where(sh => sh.UserId == userGuid)
-            .OrderByDescending(sh => sh.PlayedAt)
-            .Skip(skip)
-            .Take(take)
-            .ToListAsync();
+        using (var scope = _serviceScopeFactory.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<DatabaseContext>();
+            
+            return await context.StreamingHistory
+                .Where(sh => sh.UserId == userGuid)
+                .OrderByDescending(sh => sh.PlayedAt)
+                .Skip(skip)
+                .Take(take)
+                .ToListAsync();
+        }
     }
 
     /// <summary>
@@ -373,9 +385,14 @@ public class UserDataService
     {
         var userGuid = Guid.Parse(userId);
         
-        return await _context.StreamingHistory
-            .Where(sh => sh.UserId == userGuid)
-            .CountAsync();
+        using (var scope = _serviceScopeFactory.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<DatabaseContext>();
+            
+            return await context.StreamingHistory
+                .Where(sh => sh.UserId == userGuid)
+                .CountAsync();
+        }
     }
 
     /// <summary>
@@ -385,20 +402,25 @@ public class UserDataService
     {
         var userGuid = Guid.Parse(userId);
         
-        var entries = await _context.StreamingHistory
-            .Where(sh => sh.UserId == userGuid)
-            .ToListAsync();
-            
-        if (!entries.Any())
+        using (var scope = _serviceScopeFactory.CreateScope())
         {
-            return false;
+            var context = scope.ServiceProvider.GetRequiredService<DatabaseContext>();
+            
+            var entries = await context.StreamingHistory
+                .Where(sh => sh.UserId == userGuid)
+                .ToListAsync();
+                
+            if (!entries.Any())
+            {
+                return false;
+            }
+            
+            context.StreamingHistory.RemoveRange(entries);
+            await context.SaveChangesAsync();
+            
+            _logger.LogInformation("Deleted {Count} streaming history entries for user {UserId}", entries.Count, userId);
+            return true;
         }
-        
-        _context.StreamingHistory.RemoveRange(entries);
-        await _context.SaveChangesAsync();
-        
-        _logger.LogInformation("Deleted {Count} streaming history entries for user {UserId}", entries.Count, userId);
-        return true;
     }
 
     /// <summary>
@@ -408,41 +430,46 @@ public class UserDataService
     {
         var userGuid = Guid.Parse(userId);
         
-        // Get entry count from database
-        var entryCount = await _context.StreamingHistory
-            .Where(sh => sh.UserId == userGuid)
-            .CountAsync();
-            
-        if (entryCount == 0)
+        using (var scope = _serviceScopeFactory.CreateScope())
         {
-            return new List<UserDataFile>();
-        }
-        
-        // Get the earliest and latest play dates for metadata
-        var dateRange = await _context.StreamingHistory
-            .Where(sh => sh.UserId == userGuid)
-            .Select(sh => new { sh.PlayedAt })
-            .OrderBy(sh => sh.PlayedAt)
-            .ToListAsync();
+            var context = scope.ServiceProvider.GetRequiredService<DatabaseContext>();
             
-        var earliestDate = dateRange.FirstOrDefault()?.PlayedAt ?? DateTime.Now;
-        var latestDate = dateRange.LastOrDefault()?.PlayedAt ?? DateTime.Now;
-        
-        // Create a virtual "file" representing the database data
-        var files = new List<UserDataFile>
-        {
-            new UserDataFile
+            // Get entry count from database
+            var entryCount = await context.StreamingHistory
+                .Where(sh => sh.UserId == userGuid)
+                .CountAsync();
+                
+            if (entryCount == 0)
             {
-                FileName = "Streaming History Database",
-                FileSize = 0, // Database size is not easily calculable
-                UploadedAt = earliestDate, // Use earliest play date as "upload" date
-                EntryCount = entryCount,
-                IsDatabaseEntry = true,
-                DateRange = $"{earliestDate:yyyy-MM-dd} to {latestDate:yyyy-MM-dd}"
+                return new List<UserDataFile>();
             }
-        };
-        
-        return files;
+            
+            // Get the earliest and latest play dates for metadata
+            var dateRange = await context.StreamingHistory
+                .Where(sh => sh.UserId == userGuid)
+                .Select(sh => new { sh.PlayedAt })
+                .OrderBy(sh => sh.PlayedAt)
+                .ToListAsync();
+                
+            var earliestDate = dateRange.FirstOrDefault()?.PlayedAt ?? DateTime.Now;
+            var latestDate = dateRange.LastOrDefault()?.PlayedAt ?? DateTime.Now;
+            
+            // Create a virtual "file" representing the database data
+            var files = new List<UserDataFile>
+            {
+                new UserDataFile
+                {
+                    FileName = "Streaming History Database",
+                    FileSize = 0, // Database size is not easily calculable
+                    UploadedAt = earliestDate, // Use earliest play date as "upload" date
+                    EntryCount = entryCount,
+                    IsDatabaseEntry = true,
+                    DateRange = $"{earliestDate:yyyy-MM-dd} to {latestDate:yyyy-MM-dd}"
+                }
+            };
+            
+            return files;
+        }
     }
 
     /// <summary>

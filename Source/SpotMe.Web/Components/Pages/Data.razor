@@ -32,7 +32,6 @@
                         <div class="alert alert-success">
                             <h5><i class="bi bi-check-circle me-2"></i>Data Already Imported!</h5>
                             <p>You have <strong>@_importStats.DatabaseEntryCount.ToString("N0")</strong> streaming history entries in the database.</p>
-                            <p>Your stats are now loading super fast! 🚀</p>
                         </div>
                         
                         <div class="d-grid">
@@ -87,7 +86,7 @@
 
                             <div class="mb-3">
                                 <label for="fileInput" class="form-label">Select Spotify JSON Files</label>
-                                <InputFile id="fileInput" class="form-control file-input" multiple OnChange="OnFilesSelected" accept=".json" style="background-color: white; color: black;" />
+                                <InputFile id="fileInput" class="form-control file-input" multiple OnChange="OnFilesSelected" accept=".json" />
                                 <div class="form-text">
                                     <strong>File Requirements:</strong>
                                     <ul class="mb-0 mt-1">
@@ -102,12 +101,12 @@
                             @if (_selectedFiles?.Any() == true)
                             {
                                 <div class="mb-3">
-                                    <h6>Selected Files:</h6>
+                                    <h6 class="text-dark">Selected Files:</h6>
                                     <ul class="list-group">
                                         @foreach (var file in _selectedFiles)
                                         {
-                                            <li class="list-group-item d-flex justify-content-between align-items-center" style="background-color: transparent !important; border: 2px solid #28a745; border-radius: 8px; margin-bottom: 8px; color: black !important;">
-                                                <span style="color: black;">@file.Name (@FormatFileSize(file.Size))</span>
+                                            <li class="d-flex justify-content-between align-items-center file-list-item">
+                                                <span class="text-dark">@file.Name (@FormatFileSize(file.Size))</span>
                                                 <button type="button" class="btn btn-sm btn-outline-danger file-remove-btn" @onclick="() => RemoveFile(file)">
                                                     <i class="bi bi-x"></i>
                                                 </button>
@@ -117,7 +116,7 @@
                                 </div>
 
                                 <div class="d-grid">
-                                    <button @onclick="UploadFiles" class="btn btn-lg upload-database-btn" style="background-color: #28a745 !important; color: white !important; border: none !important;" disabled="@_isUploading">
+                                    <button @onclick="UploadFiles" class="btn btn-lg upload-database-btn" disabled="@_isUploading">
                                         @if (_isUploading)
                                         {
                                             <span class="spinner-border spinner-border-sm me-2" role="status"></span>
