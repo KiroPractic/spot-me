@@ -123,8 +123,9 @@
 				<div class="col-md-4">
 					<div class="card stat-card">
 						<div class="card-body text-center">
-							<h6 class="card-title">Unique Artists</h6>
-							<p class="card-text h4">{stats.uniqueArtists.toLocaleString()}</p>
+							<h6 class="card-title">Audiobooks</h6>
+							<p class="card-text h4">{formatTime(stats.contentTypeBreakdown.audiobookMinutes)}</p>
+							<small class="text-muted">{stats.contentTypeBreakdown.audiobookCount} chapters</small>
 						</div>
 					</div>
 				</div>

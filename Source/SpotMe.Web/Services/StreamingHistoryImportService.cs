@@ -152,6 +152,10 @@ public class StreamingHistoryImportService
     /// </summary>
     private string DetermineContentType(Models.StreamingHistoryEntry jsonEntry)
     {
+        // Check for audiobook first
+        if (!string.IsNullOrEmpty(jsonEntry.AudiobookTitle) || !string.IsNullOrEmpty(jsonEntry.AudiobookUri))
+            return "audiobook";
+        
         if (!string.IsNullOrEmpty(jsonEntry.EpisodeName) || !string.IsNullOrEmpty(jsonEntry.EpisodeShowName))
             return "podcast";
         

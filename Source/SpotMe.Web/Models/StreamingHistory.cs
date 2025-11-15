@@ -118,6 +118,8 @@ public class StreamingHistoryEntry
     {
         get
         {
+            if (!string.IsNullOrEmpty(AudiobookTitle) || !string.IsNullOrEmpty(AudiobookUri))
+                return ContentType.Audiobook;
             if (!string.IsNullOrEmpty(MasterMetadataTrackName) || !string.IsNullOrEmpty(SpotifyTrackUri))
                 return ContentType.AudioTrack;
             if (!string.IsNullOrEmpty(EpisodeName) || !string.IsNullOrEmpty(SpotifyEpisodeUri))
@@ -139,7 +141,8 @@ public enum ContentType
 {
     Unknown,
     AudioTrack,
-    Podcast
+    Podcast,
+    Audiobook
 }
 
 public enum PlaybackCompletionStatus
@@ -186,6 +189,8 @@ public class ContentTypeBreakdown
     public double AudioTrackMinutes { get; set; }
     public int PodcastCount { get; set; }
     public double PodcastMinutes { get; set; }
+    public int AudiobookCount { get; set; }
+    public double AudiobookMinutes { get; set; }
     public int UnknownCount { get; set; }
     public double UnknownMinutes { get; set; }
 }

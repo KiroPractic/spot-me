@@ -37,9 +37,14 @@ export async function apiRequest<T>(
 	const token = authStore.getToken();
 	
 	const headers: Record<string, string> = {
-		'Content-Type': 'application/json',
 		...(options.headers as Record<string, string> || {})
 	};
+	
+	// Only set Content-Type for requests that have a body (POST, PUT, PATCH)
+	const method = (options.method || 'GET').toUpperCase();
+	if (method !== 'GET' && method !== 'HEAD' && options.body !== undefined) {
+		headers['Content-Type'] = 'application/json';
+	}
 	
 	if (token) {
 		headers['Authorization'] = `Bearer ${token}`;

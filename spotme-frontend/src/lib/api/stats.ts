@@ -5,6 +5,8 @@ export interface ContentTypeBreakdown {
 	audioTrackCount: number;
 	podcastMinutes: number;
 	podcastCount: number;
+	audiobookMinutes: number;
+	audiobookCount: number;
 }
 
 export interface Stats {

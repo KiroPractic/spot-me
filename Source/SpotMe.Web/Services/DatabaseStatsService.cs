@@ -109,6 +109,11 @@ public class DatabaseStatsService
                 contentTypeBreakdown.PodcastCount = stat.Count;
                 contentTypeBreakdown.PodcastMinutes = stat.Minutes;
             }
+            else if (stat.Type == "audiobook")
+            {
+                contentTypeBreakdown.AudiobookCount = stat.Count;
+                contentTypeBreakdown.AudiobookMinutes = stat.Minutes;
+            }
             else
             {
                 contentTypeBreakdown.UnknownCount = stat.Count;
@@ -140,7 +145,8 @@ public class DatabaseStatsService
                 TotalMinutes = g.Sum(x => x.MsPlayed) / 60000.0,
                 UniqueTracks = g.Select(x => x.TrackName).Distinct().Count(),
                 UniqueAlbums = g.Where(x => x.AlbumName != null).Select(x => x.AlbumName).Distinct().Count(),
-                PrimaryContentType = g.Select(x => x.ContentType).First() == "audio" ? ContentType.AudioTrack : 
+                PrimaryContentType = g.Select(x => x.ContentType).First() == "audiobook" ? ContentType.Audiobook :
+                                    g.Select(x => x.ContentType).First() == "audio" ? ContentType.AudioTrack : 
                                     g.Select(x => x.ContentType).First() == "podcast" ? ContentType.Podcast : ContentType.Unknown
             })
             .OrderByDescending(a => a.TotalMinutes)
@@ -159,7 +165,8 @@ public class DatabaseStatsService
                 SpotifyUri = g.Select(x => x.SpotifyUri).FirstOrDefault(),
                 PlayCount = g.Count(),
                 TotalMinutes = g.Sum(x => x.MsPlayed) / 60000.0,
-                ContentType = g.Select(x => x.ContentType).First() == "audio" ? ContentType.AudioTrack : 
+                ContentType = g.Select(x => x.ContentType).First() == "audiobook" ? ContentType.Audiobook :
+                             g.Select(x => x.ContentType).First() == "audio" ? ContentType.AudioTrack : 
                              g.Select(x => x.ContentType).First() == "podcast" ? ContentType.Podcast : ContentType.Unknown,
                 AveragePlayDuration = g.Average(x => x.MsPlayed) / 60000.0,
                 MostCommonCompletionStatus = PlaybackCompletionStatus.Unknown // Would need to add this field to schema
