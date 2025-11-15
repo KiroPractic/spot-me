@@ -23,13 +23,16 @@ public class DatabaseStatsService
     /// <summary>
     /// Get stats overview using optimized database queries
     /// </summary>
-    public async Task<StatsOverview> GetStatsOverviewAsync(DateOnly? startDate = null, DateOnly? endDate = null)
+    public async Task<StatsOverview> GetStatsOverviewAsync(DateOnly? startDate = null, DateOnly? endDate = null, Guid? userId = null)
     {
-        var userId = Guid.Parse(_userDataService.GetCurrentUserId());
+        if (userId == null)
+        {
+            userId = Guid.Parse(_userDataService.GetCurrentUserId());
+        }
         
         // Build base query with date filtering
         var query = _context.StreamingHistory
-            .Where(sh => sh.UserId == userId);
+            .Where(sh => sh.UserId == userId.Value);
 
         if (startDate.HasValue)
         {
@@ -253,18 +256,24 @@ public class DatabaseStatsService
     /// <summary>
     /// Check if user has data imported to database
     /// </summary>
-    public async Task<bool> HasImportedDataAsync()
+    public async Task<bool> HasImportedDataAsync(Guid? userId = null)
     {
-        var userId = Guid.Parse(_userDataService.GetCurrentUserId());
-        return await _context.StreamingHistory.AnyAsync(sh => sh.UserId == userId);
+        if (userId == null)
+        {
+            userId = Guid.Parse(_userDataService.GetCurrentUserId());
+        }
+        return await _context.StreamingHistory.AnyAsync(sh => sh.UserId == userId.Value);
     }
 
     /// <summary>
     /// Get count of imported entries for current user
     /// </summary>
-    public async Task<int> GetImportedEntryCountAsync()
+    public async Task<int> GetImportedEntryCountAsync(Guid? userId = null)
     {
-        var userId = Guid.Parse(_userDataService.GetCurrentUserId());
-        return await _context.StreamingHistory.CountAsync(sh => sh.UserId == userId);
+        if (userId == null)
+        {
+            userId = Guid.Parse(_userDataService.GetCurrentUserId());
+        }
+        return await _context.StreamingHistory.CountAsync(sh => sh.UserId == userId.Value);
     }
 }

@@ -9,31 +9,31 @@ namespace SpotMe.Web.Services;
 
 public class UserDataService
 {
-    private readonly CustomAuthenticationService _authService;
     private readonly IWebHostEnvironment _environment;
     private readonly ILogger<UserDataService> _logger;
     private readonly IServiceScopeFactory _serviceScopeFactory;
+    private readonly IHttpContextAccessor _httpContextAccessor;
 
-    public UserDataService(CustomAuthenticationService authService, IWebHostEnvironment environment, ILogger<UserDataService> logger, IServiceScopeFactory serviceScopeFactory)
+    public UserDataService(IWebHostEnvironment environment, ILogger<UserDataService> logger, IServiceScopeFactory serviceScopeFactory, IHttpContextAccessor httpContextAccessor)
     {
-        _authService = authService;
         _environment = environment;
         _logger = logger;
         _serviceScopeFactory = serviceScopeFactory;
+        _httpContextAccessor = httpContextAccessor;
     }
 
     /// <summary>
-    /// Get the current authenticated user ID
+    /// Get the current authenticated user ID from JWT claims
     /// </summary>
     public string GetCurrentUserId()
     {
-        var user = _authService.CurrentUser;
-        if (!user.Identity?.IsAuthenticated == true)
+        var httpContext = _httpContextAccessor.HttpContext;
+        if (httpContext?.User?.Identity?.IsAuthenticated != true)
         {
             throw new UnauthorizedAccessException("User is not authenticated");
         }
 
-        var userId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        var userId = httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
         if (string.IsNullOrEmpty(userId))
         {
             throw new UnauthorizedAccessException("User ID not found in claims");

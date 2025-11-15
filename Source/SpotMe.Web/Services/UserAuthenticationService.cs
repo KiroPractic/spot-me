@@ -10,16 +10,13 @@ public class UserAuthenticationService
 {
     private readonly DatabaseContext _context;
     private readonly PasswordHashingService _passwordHashingService;
-    private readonly CustomAuthenticationService _authService;
 
     public UserAuthenticationService(
         DatabaseContext context, 
-        PasswordHashingService passwordHashingService,
-        CustomAuthenticationService authService)
+        PasswordHashingService passwordHashingService)
     {
         _context = context;
         _passwordHashingService = passwordHashingService;
-        _authService = authService;
     }
 
     public async Task<(bool Success, string Message, User? User)> RegisterUserAsync(string email, string password)
@@ -80,48 +77,7 @@ public class UserAuthenticationService
         return (true, "Authentication successful", user);
     }
 
-    public async Task<(bool Success, string Message)> SignInUserAsync(string email, string password)
-    {
-        var authResult = await AuthenticateUserAsync(email, password);
-        
-        if (!authResult.Success || authResult.User == null)
-        {
-            return (false, authResult.Message);
-        }
-
-        var signInSuccess = await _authService.SignInAsync(authResult.User.EmailAddress, authResult.User.Id.ToString());
-        
-        if (signInSuccess)
-        {
-            return (true, "Sign in successful");
-        }
-        
-        return (false, "Failed to sign in user");
-    }
-
-    public async Task<(bool Success, string Message)> RegisterAndSignInUserAsync(string email, string password)
-    {
-        var registerResult = await RegisterUserAsync(email, password);
-        
-        if (!registerResult.Success || registerResult.User == null)
-        {
-            return (false, registerResult.Message);
-        }
-
-        var signInSuccess = await _authService.SignInAsync(registerResult.User.EmailAddress, registerResult.User.Id.ToString());
-        
-        if (signInSuccess)
-        {
-            return (true, "Registration and sign in successful");
-        }
-        
-        return (false, "User registered but failed to sign in");
-    }
-
-    public async Task<bool> SignOutUserAsync()
-    {
-        return await _authService.SignOutAsync();
-    }
+    // These methods are no longer needed with JWT - tokens are handled by endpoints
 
 
 
