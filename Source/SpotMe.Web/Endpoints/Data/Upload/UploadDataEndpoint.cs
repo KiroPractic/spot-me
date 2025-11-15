@@ -1,8 +1,11 @@
 using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
+using SpotMe.Web.Domain;
 using SpotMe.Web.Persistency;
 using SpotMe.Web.Services;
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 
 namespace SpotMe.Web.Endpoints.Data.Upload;
@@ -79,8 +82,32 @@ public class UploadDataEndpoint : EndpointWithoutRequest<UploadDataResponse>
                 fileContent = memoryStream.ToArray();
             }
 
+            // Calculate file hash (SHA256) to detect duplicate uploads
+            var fileHash = ComputeFileHash(fileContent);
+            
+            // Check if this file has already been uploaded by this user
+            var existingUpload = await _context.UploadedFiles
+                .FirstOrDefaultAsync(uf => uf.UserId == userId && uf.FileHash == fileHash, ct);
+            
+            if (existingUpload != null)
+            {
+                _logger.LogWarning("User {UserId} attempted to upload duplicate file {FileName} (hash: {FileHash}). Previously uploaded on {UploadDate}",
+                    userId, fileName, fileHash, existingUpload.UploadedAt);
+                
+                await SendOkAsync(new UploadDataResponse
+                {
+                    Success = false,
+                    Message = $"This file has already been uploaded on {existingUpload.UploadedAt:yyyy-MM-dd HH:mm:ss}. Please upload a different file.",
+                    FileName = fileName,
+                    TotalProcessed = 0,
+                    EntryCount = 0,
+                    SkippedCount = 0
+                }, ct);
+                return;
+            }
+
             // Parse JSON content
-            var jsonContent = System.Text.Encoding.UTF8.GetString(fileContent);
+            var jsonContent = Encoding.UTF8.GetString(fileContent);
             var jsonEntries = JsonSerializer.Deserialize<List<Models.StreamingHistoryEntry>>(jsonContent, new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true
@@ -97,42 +124,30 @@ public class UploadDataEndpoint : EndpointWithoutRequest<UploadDataResponse>
                 return;
             }
 
-            // Check if user already has data
-            var existingCount = await _context.StreamingHistory
-                .Where(sh => sh.UserId == userId)
-                .CountAsync(ct);
-
-            if (existingCount > 0)
+            // Create UploadedFile record first to get its ID
+            var uploadedFile = new UploadedFile
             {
-                await SendOkAsync(new UploadDataResponse
-                {
-                    Success = true,
-                    Message = $"User already has {existingCount} entries in database",
-                    FileName = fileName,
-                    EntryCount = existingCount
-                }, ct);
-                return;
-            }
-
-            // Convert and save to database
+                UserId = userId,
+                FileName = fileName,
+                FileHash = fileHash,
+                FileSize = file.Length,
+                UploadedAt = DateTime.UtcNow
+            };
+            
+            _context.UploadedFiles.Add(uploadedFile);
+            await _context.SaveChangesAsync(ct);
+            
+            // Convert JSON entries to database entries with UploadedFileId
             var dbEntries = new List<StreamingHistoryEntry>();
-            var batchSize = 1000;
-            var savedCount = 0;
-
+            var totalProcessed = 0;
+            
             foreach (var jsonEntry in jsonEntries)
             {
                 try
                 {
-                    var dbEntry = ConvertJsonToDbEntry(userId, jsonEntry);
+                    var dbEntry = ConvertJsonToDbEntry(userId, uploadedFile.Id, jsonEntry);
                     dbEntries.Add(dbEntry);
-
-                    if (dbEntries.Count >= batchSize)
-                    {
-                        _context.StreamingHistory.AddRange(dbEntries);
-                        await _context.SaveChangesAsync(ct);
-                        savedCount += dbEntries.Count;
-                        dbEntries.Clear();
-                    }
+                    totalProcessed++;
                 }
                 catch (Exception ex)
                 {
@@ -140,20 +155,49 @@ public class UploadDataEndpoint : EndpointWithoutRequest<UploadDataResponse>
                 }
             }
 
-            if (dbEntries.Any())
+            if (!dbEntries.Any())
             {
-                _context.StreamingHistory.AddRange(dbEntries);
+                // Delete the uploaded file record if no valid entries
+                _context.UploadedFiles.Remove(uploadedFile);
                 await _context.SaveChangesAsync(ct);
-                savedCount += dbEntries.Count;
+                
+                await SendOkAsync(new UploadDataResponse
+                {
+                    Success = true,
+                    Message = "No valid entries found in file",
+                    FileName = fileName,
+                    TotalProcessed = totalProcessed,
+                    EntryCount = 0,
+                    SkippedCount = 0
+                }, ct);
+                return;
             }
 
-            await SendOkAsync(new UploadDataResponse
+            // Disable change tracking for bulk inserts (significant performance improvement)
+            var originalAutoDetectChanges = _context.ChangeTracker.AutoDetectChangesEnabled;
+            _context.ChangeTracker.AutoDetectChangesEnabled = false;
+
+            try
             {
-                Success = true,
-                Message = $"Successfully saved {savedCount} entries to database",
-                FileName = fileName,
-                EntryCount = savedCount
-            }, ct);
+                // Insert all entries with file reference
+                _context.StreamingHistory.AddRange(dbEntries);
+                await _context.SaveChangesAsync(ct);
+                
+                await SendOkAsync(new UploadDataResponse
+                {
+                    Success = true,
+                    Message = $"Successfully saved {dbEntries.Count} entries to database",
+                    FileName = fileName,
+                    EntryCount = dbEntries.Count,
+                    SkippedCount = 0,
+                    TotalProcessed = totalProcessed
+                }, ct);
+            }
+            finally
+            {
+                // Restore original change tracking setting
+                _context.ChangeTracker.AutoDetectChangesEnabled = originalAutoDetectChanges;
+            }
         }
         catch (Exception ex)
         {
@@ -161,12 +205,12 @@ public class UploadDataEndpoint : EndpointWithoutRequest<UploadDataResponse>
             await SendOkAsync(new UploadDataResponse
             {
                 Success = false,
-                Message = ex.Message
+                Message = $"An error occurred: {ex.Message}"
             }, ct);
         }
     }
 
-    private StreamingHistoryEntry ConvertJsonToDbEntry(Guid userId, Models.StreamingHistoryEntry jsonEntry)
+    private StreamingHistoryEntry ConvertJsonToDbEntry(Guid userId, Guid uploadedFileId, Models.StreamingHistoryEntry jsonEntry)
     {
         var playedAt = DateTime.Parse(jsonEntry.Timestamp ?? DateTime.MinValue.ToString(), null, System.Globalization.DateTimeStyles.None);
         playedAt = DateTime.SpecifyKind(playedAt, DateTimeKind.Unspecified);
@@ -181,6 +225,7 @@ public class UploadDataEndpoint : EndpointWithoutRequest<UploadDataResponse>
             msPlayed: jsonEntry.MsPlayed,
             platform: jsonEntry.Platform ?? "unknown",
             contentType: contentType,
+            uploadedFileId: uploadedFileId,
             countryCode: jsonEntry.PlayedInCountryCode,
             spotifyUri: jsonEntry.SpotifyTrackUri ?? jsonEntry.SpotifyEpisodeUri,
             trackName: trackName,
@@ -209,5 +254,13 @@ public class UploadDataEndpoint : EndpointWithoutRequest<UploadDataResponse>
 
         return "audio";
     }
+
+    private static string ComputeFileHash(byte[] fileContent)
+    {
+        using var sha256 = SHA256.Create();
+        var hashBytes = sha256.ComputeHash(fileContent);
+        return Convert.ToHexString(hashBytes).ToLowerInvariant();
+    }
 }
+
 

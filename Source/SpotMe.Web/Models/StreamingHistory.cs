@@ -168,9 +168,7 @@ public class StatsOverview
     public ContentTypeBreakdown ContentTypeBreakdown { get; set; } = new();
     public PlatformBreakdown PlatformBreakdown { get; set; } = new();
     public PlaybackBehavior PlaybackBehavior { get; set; } = new();
-    public List<ArtistStats> TopArtists { get; set; } = new();
-    public List<TrackStats> TopTracks { get; set; } = new();
-    public List<AlbumStats> TopAlbums { get; set; } = new();
+    // Removed TopArtists, TopTracks, TopAlbums - use MusicStats for music, TopPodcasts for podcasts
     public List<PodcastStats> TopPodcasts { get; set; } = new();
     
     // Music-specific statistics
@@ -292,6 +290,7 @@ public class DayOfWeekStats
     public int PlayCount { get; set; }
     public double TotalMinutes { get; set; }
     public double AverageMinutesPerOccurrence { get; set; }
+    public double AverageMinutesPerDay { get; set; }
 }
 
 public class HourOfDayStats
@@ -301,6 +300,7 @@ public class HourOfDayStats
     public int PlayCount { get; set; }
     public double TotalMinutes { get; set; }
     public double AverageMinutesPerOccurrence { get; set; }
+    public double AverageMinutesPerDay { get; set; }
 }
 
 public class MonthlyStats

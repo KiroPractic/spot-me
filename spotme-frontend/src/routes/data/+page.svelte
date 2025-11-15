@@ -11,6 +11,8 @@
 	let uploadProgress: { fileName: string; status: 'uploading' | 'success' | 'error'; message: string }[] = [];
 	let selectedFiles: File[] = [];
 	let showInstructions = true;
+	let hadFilesOnInitialLoad = false;
+	let filesAddedAfterLoad = false;
 	
 	onMount(() => {
 		if (!$authStore.isAuthenticated) {
@@ -23,7 +25,18 @@
 	async function loadFiles() {
 		try {
 			const response = await dataApi.getFiles();
+			const previousFileCount = files.length;
 			files = response.files;
+			
+			// Track initial load state
+			if (loading) {
+				hadFilesOnInitialLoad = files.length > 0;
+			}
+			
+			// Track if files were added (not just deleted)
+			if (!loading && files.length > previousFileCount) {
+				filesAddedAfterLoad = true;
+			}
 		} catch (error) {
 			console.error('Failed to load files:', error);
 		} finally {
@@ -89,15 +102,15 @@
 		uploading = false;
 	}
 	
-	async function handleDelete(fileName: string) {
-		if (!confirm(`Are you sure you want to delete all your streaming history data? This action cannot be undone.`)) return;
+	async function handleDelete(file: FileInfo) {
+		if (!confirm(`Are you sure you want to delete "${file.fileName}"? This will remove ${file.entryCount.toLocaleString()} entries. This action cannot be undone.`)) return;
 		
 		try {
-			await dataApi.deleteFile(fileName);
+			await dataApi.deleteFile(file.fileId, file.fileName);
 			await loadFiles();
 		} catch (error) {
 			console.error('Failed to delete file:', error);
-			alert('Failed to delete data');
+			alert('Failed to delete file');
 		}
 	}
 	
@@ -242,62 +255,76 @@
 	</div>
 	
 	<!-- Uploaded Files Section -->
-	<div class="card">
-		<div class="card-header">
-			<h5 class="card-title mb-0">
-				<i class="bi bi-folder me-2"></i>
-				Your Data
-			</h5>
-		</div>
-		<div class="card-body p-0">
-			{#if loading}
-				<div class="text-center py-4">
-					<div class="spinner-border" role="status">
-						<span class="visually-hidden">Loading...</span>
-					</div>
-				</div>
-			{:else if files.length > 0}
-				<div class="data-files-list">
-					{#each files as file}
-						<div class="data-file-item">
-							<div class="data-file-info">
-								<div class="data-file-name">
-									<i class="bi bi-database me-2"></i>
-									<strong>{file.fileName}</strong>
-								</div>
-								<div class="data-file-meta">
-									<span class="data-file-entries">
-										<i class="bi bi-music-note-list me-1"></i>
-										{file.entryCount.toLocaleString()} entries
-									</span>
-									{#if file.dateRange}
-										<span class="data-file-dates">
-											<i class="bi bi-calendar-range me-1"></i>
-											{file.dateRange}
-										</span>
-									{/if}
-								</div>
-							</div>
-							<div class="data-file-actions">
-								<button 
-									class="btn btn-danger btn-sm" 
-									on:click={() => handleDelete(file.fileName)}
-									title="Delete all streaming history data"
-								>
-									<i class="bi bi-trash me-1"></i>
-									Delete
-								</button>
-							</div>
+	{#if hadFilesOnInitialLoad || filesAddedAfterLoad || files.length > 0}
+		<div class="card">
+			<div class="card-header">
+				<h5 class="card-title mb-0">
+					<i class="bi bi-folder me-2"></i>
+					Your Data
+				</h5>
+			</div>
+			<div class="card-body p-0">
+				{#if loading}
+					<div class="text-center py-4">
+						<div class="spinner-border" role="status">
+							<span class="visually-hidden">Loading...</span>
 						</div>
-					{/each}
-				</div>
-			{:else}
-				<div class="alert alert-info m-3 mb-0">
-					<i class="bi bi-info-circle me-2"></i>
-					No data uploaded yet. Follow the instructions above to download and upload your Spotify streaming history JSON files.
-				</div>
-			{/if}
+					</div>
+				{:else if files.length > 0}
+					<div class="data-files-list">
+						{#each files as file}
+							<div class="data-file-item">
+								<div class="data-file-info">
+									<div class="data-file-name">
+										<i class="bi bi-file-earmark-json me-2"></i>
+										<strong>{file.fileName}</strong>
+									</div>
+									<div class="data-file-meta">
+										<span class="data-file-entries">
+											<i class="bi bi-music-note-list me-1"></i>
+											{file.entryCount.toLocaleString()} entries
+										</span>
+										{#if file.dateRange}
+											<span class="data-file-dates">
+												<i class="bi bi-calendar-range me-1"></i>
+												{file.dateRange}
+											</span>
+										{/if}
+										{#if file.fileSize}
+											<span class="data-file-size">
+												<i class="bi bi-hdd me-1"></i>
+												{formatFileSize(file.fileSize)}
+											</span>
+										{/if}
+										{#if file.uploadedAt}
+											<span class="data-file-uploaded">
+												<i class="bi bi-clock me-1"></i>
+												Uploaded {new Date(file.uploadedAt).toLocaleDateString()}
+											</span>
+										{/if}
+									</div>
+								</div>
+								<div class="data-file-actions">
+									<button 
+										class="btn btn-danger btn-sm" 
+										on:click={() => handleDelete(file)}
+										title="Delete this file and its entries"
+									>
+										<i class="bi bi-trash me-1"></i>
+										Delete
+									</button>
+								</div>
+							</div>
+						{/each}
+					</div>
+				{:else}
+					<div class="alert alert-info m-3 mb-0">
+						<i class="bi bi-info-circle me-2"></i>
+						No data uploaded yet. Follow the instructions above to download and upload your Spotify streaming history JSON files.
+					</div>
+				{/if}
+			</div>
 		</div>
-	</div>
+	{/if}
 </div>
 

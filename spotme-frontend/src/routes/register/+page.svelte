@@ -46,7 +46,7 @@
 <div class="dark-container">
 	<div class="spotify-content">
 		<div class="auth-card">
-			<h1 class="mb-4">Create Account</h1>
+			<h1 class="mb-4 text-center">Create Account</h1>
 			<form on:submit={handleSubmit}>
 				<div class="mb-3">
 					<label for="email" class="form-label">Email</label>
@@ -83,7 +83,7 @@
 				{#if error}
 					<div class="alert alert-danger">{error}</div>
 				{/if}
-				<button type="submit" class="btn btn-primary spotify-button w-100 mb-3" disabled={loading}>
+				<button type="submit" class="btn btn-primary spotify-button w-100 mb-3 mt-4" disabled={loading}>
 					{#if loading}
 						<span class="spinner-border spinner-border-sm me-2"></span>
 					{:else}
@@ -92,7 +92,7 @@
 					Register
 				</button>
 			</form>
-			<p class="text-center mt-3">
+			<p class="text-left mt-3">
 				Already have an account? <a href="/login">Sign in here</a>
 			</p>
 		</div>

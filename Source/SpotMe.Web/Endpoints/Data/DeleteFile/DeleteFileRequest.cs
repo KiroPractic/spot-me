@@ -2,6 +2,7 @@ namespace SpotMe.Web.Endpoints.Data.DeleteFile;
 
 public class DeleteFileRequest
 {
-    public string FileName { get; set; } = string.Empty;
+    public string? FileId { get; set; }
+    public string? FileName { get; set; } // For backward compatibility
 }
 

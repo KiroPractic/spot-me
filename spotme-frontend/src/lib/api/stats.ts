@@ -9,11 +9,97 @@ export interface ContentTypeBreakdown {
 	audiobookCount: number;
 }
 
+export interface ArtistStats {
+	artistName: string;
+	playCount: number;
+	totalMinutes: number;
+	uniqueTracks: number;
+	uniqueAlbums: number;
+	primaryContentType: string;
+}
+
+export interface TrackStats {
+	artistName: string;
+	trackName: string;
+	albumName?: string;
+	spotifyUri?: string;
+	playCount: number;
+	totalMinutes: number;
+	contentType: string;
+	averagePlayDuration: number;
+	mostCommonCompletionStatus: string;
+}
+
+export interface AlbumStats {
+	artistName: string;
+	albumName: string;
+	playCount: number;
+	totalMinutes: number;
+	uniqueTracks: number;
+}
+
+export interface MusicStats {
+	totalMusicTracks: number;
+	totalMusicMinutes: number;
+	uniqueMusicArtists: number;
+	uniqueMusicTracks: number;
+	uniqueMusicAlbums: number;
+	topMusicArtists?: ArtistStats[];
+	topMusicTracks?: TrackStats[];
+	topMusicAlbums?: AlbumStats[];
+}
+
+export interface DayOfWeekStats {
+	dayOfWeek: number; // 0 = Sunday, 1 = Monday, etc.
+	dayName: string;
+	playCount: number;
+	totalMinutes: number;
+	averageMinutesPerOccurrence: number;
+	averageMinutesPerDay: number;
+}
+
+export interface HourOfDayStats {
+	hour: number;
+	hourLabel: string;
+	playCount: number;
+	totalMinutes: number;
+	averageMinutesPerOccurrence: number;
+	averageMinutesPerDay: number;
+}
+
+export interface MonthlyStats {
+	month: number;
+	year: number;
+	monthName: string;
+	monthYearLabel: string;
+	playCount: number;
+	totalMinutes: number;
+	averageMinutesPerDay: number;
+}
+
+export interface TimeBasedStats {
+	dayOfWeekStats: DayOfWeekStats[];
+	hourOfDayStats: HourOfDayStats[];
+	monthlyStats: MonthlyStats[];
+}
+
+export interface CountryStats {
+	countryCode: string;
+	countryName: string;
+	playCount: number;
+	totalMinutes: number;
+	uniqueTracks: number;
+	uniqueArtists: number;
+}
+
 export interface Stats {
 	totalMinutes: number;
 	totalTracks: number;
 	contentTypeBreakdown: ContentTypeBreakdown;
 	uniqueArtists: number;
+	musicStats?: MusicStats;
+	timeBasedStats?: TimeBasedStats;
+	countryStats?: CountryStats[];
 }
 
 export interface StatsResponse {

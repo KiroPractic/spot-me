@@ -1,96 +1,150 @@
 # SpotMe
 
-A .NET 8 application with Blazor frontend and Entity Framework Core backend using PostgreSQL.
+A Spotify statistics application with a .NET 8 backend API and SvelteKit frontend, using PostgreSQL for data storage.
 
 ## Project Structure
 
-- **SpotMe.Model**: Contains domain model classes for persistence
-- **SpotMe.Web**: Blazor Server application (web frontend and backend)
+- **SpotMe.Model**: Domain model classes for persistence
+- **SpotMe.Web**: .NET 8 backend API (ASP.NET Core)
+- **spotme-frontend**: SvelteKit frontend application
 
-## Development Setup
+## Prerequisites
 
-### Prerequisites
+- **Docker** and **Docker Compose**
+- **Git**
 
-- Docker and Docker Compose
-- Git
+## Quick Start
 
-### Getting Started
-
-1. Clone the repository
-2. Make sure Docker is installed
-3. Configure the Blazorise license key (see Configuration section below)
-4. Start the development environment:
-   ```
-   docker compose up -d
+1. Clone the repository:
+   ```bash
+   git clone <repository-url>
+   cd spot-me
    ```
 
-## Configuration
+2. Start all services with Docker Compose:
+   ```bash
+   docker-compose up --build
+   ```
 
-### Blazorise License Key
+3. Access the application:
+   - **Frontend**: http://localhost:5173
+   - **Backend API**: http://localhost:5000
+   - **Database**: localhost:5432
 
-This application uses Blazorise components which require a license key. The license key should **never** be committed to version control.
+That's it! All services will start with hot reload enabled.
 
-#### For Development (Recommended)
+## Service URLs
 
-Use .NET User Secrets to store the license key securely:
+When running locally, the following services are available:
 
-```bash
-cd Source/SpotMe.Web
-dotnet user-secrets set "Blazorise:ProductToken" "YOUR_LICENSE_KEY_HERE"
-```
+| Service | URL | Description |
+|---------|-----|-------------|
+| **Frontend** | http://localhost:5173 | SvelteKit web application (hot reload enabled) |
+| **Backend API** | http://localhost:5000 | .NET 8 REST API (hot reload via `dotnet watch`) |
+| **API Endpoints** | http://localhost:5000/api | All API routes are under `/api` |
+| **PostgreSQL** | localhost:5432 | Database connection |
+| **SMTP4dev** | http://localhost:3000 | Development email server (for testing emails) |
+| **File Browser** | http://localhost:8081 | Web UI to browse uploaded user files |
 
-#### For Production
+## Development Features
 
-Set the license key as an environment variable:
+### Hot Reload
 
-```bash
-# Linux/macOS
-export Blazorise__ProductToken="YOUR_LICENSE_KEY_HERE"
+Both frontend and backend support hot reload:
 
-# Windows PowerShell
-$env:Blazorise__ProductToken="YOUR_LICENSE_KEY_HERE"
+- **Frontend**: Vite automatically reloads on `.svelte`, `.ts`, `.js`, and `.css` changes
+- **Backend**: `dotnet watch` automatically rebuilds and restarts on `.cs` file changes
+- **Database**: PostgreSQL data persists in Docker volumes
 
-# Windows Command Prompt
-set Blazorise__ProductToken=YOUR_LICENSE_KEY_HERE
-```
+### Database Connection
 
-Or add it to your deployment configuration (Azure App Service, Docker, etc.) as an environment variable.
-
-### Development Tools
-
-- **PostgreSQL**: Running on port 5432
-  - Username: spotme
-  - Password: spotme_password
-  - Database: spotme_db
-- **SMTP Server (smtp4dev)**: Web interface available at http://localhost:3000
-- **Blazor Application**: The web application will be available at http://localhost:5000 when running
+The database is automatically configured in Docker. Connection details:
+- **Host**: `postgres` (within Docker network) or `localhost` (from host)
+- **Port**: `5432`
+- **Username**: `spotme`
+- **Password**: `spotme_password`
+- **Database**: `spotme_db`
 
 ## Common Commands
 
-Build the solution:
-```
-docker exec -it spotme-dotnet-sdk dotnet build /app/SpotMe.sln
+### Start Services
+```bash
+# Start all services
+docker-compose up
+
+# Start in background (detached mode)
+docker-compose up -d
+
+# Rebuild and start
+docker-compose up --build
 ```
 
-Run the web application:
-```
-docker exec -it spotme-dotnet-sdk dotnet run --project /app/SpotMe.Web/SpotMe.Web.csproj
-```
+### View Logs
+```bash
+# All services
+docker-compose logs -f
 
-Run in watch mode (auto-reload on code changes):
-```
-docker exec -it spotme-dotnet-sdk dotnet watch --project /app/SpotMe.Web/SpotMe.Web.csproj run
-```
-
-Stop all containers:
-```
-docker compose down
+# Specific service
+docker-compose logs -f frontend
+docker-compose logs -f app
+docker-compose logs -f postgres
 ```
 
-## Future Plans
+### Stop Services
+```bash
+# Stop all services
+docker-compose down
 
-- Android application using .NET MAUI
+# Stop and remove volumes (⚠️ deletes database data)
+docker-compose down -v
+```
 
-## Additional Information
+### Database Commands
+```bash
+# Connect to PostgreSQL
+docker exec -it spotme-postgres psql -U spotme -d spotme_db
 
-See CLAUDE.md for detailed coding guidelines and additional commands.
+# Run migrations manually (usually auto-applied on startup)
+docker exec -it spotme-app-dev dotnet ef database update --project SpotMe.Web
+```
+
+## Troubleshooting
+
+### Port Already in Use
+If a port is already in use, you can:
+- Stop the conflicting service
+- Or modify the port mapping in `docker-compose.yml`
+
+### Frontend Not Loading
+- Check if the frontend container is running: `docker-compose ps`
+- View frontend logs: `docker-compose logs frontend`
+- Ensure port 5173 is not in use
+
+### Backend Not Responding
+- Check backend logs: `docker-compose logs app`
+- Verify database is healthy: `docker-compose ps postgres`
+- Check if port 5000 is available
+
+### Database Connection Issues
+- Ensure PostgreSQL container is running: `docker-compose ps postgres`
+- Check database health: `docker exec spotme-postgres pg_isready -U spotme`
+- View database logs: `docker-compose logs postgres`
+
+### Hot Reload Not Working
+- For frontend: Ensure files are saved and Vite detects changes
+- For backend: Check that `dotnet watch` is running (should see "watch" in logs)
+- Try restarting the specific service: `docker-compose restart frontend` or `docker-compose restart app`
+
+## Project Architecture
+
+- **Backend**: RESTful API built with ASP.NET Core Minimal APIs
+- **Frontend**: SvelteKit with TypeScript
+- **Database**: PostgreSQL with Entity Framework Core
+- **Authentication**: JWT-based authentication
+- **File Storage**: User-uploaded Spotify data files stored in Docker volumes
+
+## Additional Documentation
+
+- **HOW_TO_RUN.md**: Detailed setup instructions (legacy, now using Docker)
+- **DOCKER_SETUP.md**: Docker-specific configuration and data management
+- **ARCHITECTURE.md**: System architecture and design decisions

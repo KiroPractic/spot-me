@@ -2,6 +2,8 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using SpotMe.Web.Models;
 using SpotMe.Web.Persistency;
+using SpotMe.Web.Domain;
+using System.Security.Cryptography;
 
 namespace SpotMe.Web.Services;
 
@@ -58,41 +60,67 @@ public class StreamingHistoryImportService
             _logger.LogInformation("Converting {Count} JSON entries to database format for user {UserId}", 
                 jsonEntries.Count, userId);
 
+            // Create a placeholder UploadedFile record for legacy import
+            // Note: This service should be updated to accept a file parameter
+            var uploadedFile = new UploadedFile
+            {
+                UserId = userGuid,
+                FileName = "Legacy Import",
+                FileHash = Guid.NewGuid().ToString(), // Placeholder hash
+                FileSize = 0,
+                UploadedAt = DateTime.UtcNow
+            };
+            
+            _context.UploadedFiles.Add(uploadedFile);
+            await _context.SaveChangesAsync();
+
             var dbEntries = new List<StreamingHistoryEntry>();
-            var batchSize = 1000;
+            var batchSize = 10000; // Increased batch size for better performance
             var processed = 0;
 
-            foreach (var jsonEntry in jsonEntries)
-            {
-                try
-                {
-                    var dbEntry = ConvertJsonToDbEntry(userGuid, jsonEntry);
-                    dbEntries.Add(dbEntry);
-                    processed++;
+            // Disable change tracking for bulk inserts (significant performance improvement)
+            var originalAutoDetectChanges = _context.ChangeTracker.AutoDetectChangesEnabled;
+            _context.ChangeTracker.AutoDetectChangesEnabled = false;
 
-                    // Batch insert for performance
-                    if (dbEntries.Count >= batchSize)
+            try
+            {
+                foreach (var jsonEntry in jsonEntries)
+                {
+                    try
                     {
-                        await InsertBatchAsync(dbEntries);
-                        result.ImportedCount += dbEntries.Count;
-                        dbEntries.Clear();
-                        
-                        _logger.LogDebug("Imported batch of {BatchSize} entries for user {UserId}. Total: {Total}", 
-                            batchSize, userId, result.ImportedCount);
+                        var dbEntry = ConvertJsonToDbEntry(userGuid, uploadedFile.Id, jsonEntry);
+                        dbEntries.Add(dbEntry);
+                        processed++;
+
+                        // Batch insert for performance
+                        if (dbEntries.Count >= batchSize)
+                        {
+                            await InsertBatchAsync(dbEntries);
+                            result.ImportedCount += dbEntries.Count;
+                            dbEntries.Clear();
+                            
+                            _logger.LogDebug("Imported batch of {BatchSize} entries for user {UserId}. Total: {Total}", 
+                                batchSize, userId, result.ImportedCount);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to convert entry {Index} for user {UserId}", processed, userId);
+                        result.ErrorCount++;
                     }
                 }
-                catch (Exception ex)
+
+                // Insert remaining entries
+                if (dbEntries.Any())
                 {
-                    _logger.LogWarning(ex, "Failed to convert entry {Index} for user {UserId}", processed, userId);
-                    result.ErrorCount++;
+                    await InsertBatchAsync(dbEntries);
+                    result.ImportedCount += dbEntries.Count;
                 }
             }
-
-            // Insert remaining entries
-            if (dbEntries.Any())
+            finally
             {
-                await InsertBatchAsync(dbEntries);
-                result.ImportedCount += dbEntries.Count;
+                // Restore original change tracking setting
+                _context.ChangeTracker.AutoDetectChangesEnabled = originalAutoDetectChanges;
             }
 
             result.Success = true;
@@ -112,7 +140,7 @@ public class StreamingHistoryImportService
     /// <summary>
     /// Convert JSON streaming entry to database entity
     /// </summary>
-    private StreamingHistoryEntry ConvertJsonToDbEntry(Guid userId, Models.StreamingHistoryEntry jsonEntry)
+    private StreamingHistoryEntry ConvertJsonToDbEntry(Guid userId, Guid uploadedFileId, Models.StreamingHistoryEntry jsonEntry)
     {
         // Parse timestamp from Spotify JSON 
         // Note: Despite the 'Z' suffix, Spotify appears to store local times in UTC format
@@ -132,6 +160,7 @@ public class StreamingHistoryImportService
             msPlayed: jsonEntry.MsPlayed,
             platform: jsonEntry.Platform ?? "unknown",
             contentType: contentType,
+            uploadedFileId: uploadedFileId,
             countryCode: jsonEntry.PlayedInCountryCode,
             spotifyUri: jsonEntry.SpotifyTrackUri ?? jsonEntry.SpotifyEpisodeUri,
             trackName: trackName,

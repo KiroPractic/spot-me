@@ -134,67 +134,14 @@ public class DatabaseStatsService
             platformBreakdown.PlatformMinutes[stat.Platform] = stat.Minutes;
         }
 
-        // Top artists - optimized query
-        var topArtists = await query
-            .Where(sh => sh.ArtistName != null)
-            .GroupBy(sh => sh.ArtistName)
-            .Select(g => new ArtistStats
-            {
-                ArtistName = g.Key!,
-                PlayCount = g.Count(),
-                TotalMinutes = g.Sum(x => x.MsPlayed) / 60000.0,
-                UniqueTracks = g.Select(x => x.TrackName).Distinct().Count(),
-                UniqueAlbums = g.Where(x => x.AlbumName != null).Select(x => x.AlbumName).Distinct().Count(),
-                PrimaryContentType = g.Select(x => x.ContentType).First() == "audiobook" ? ContentType.Audiobook :
-                                    g.Select(x => x.ContentType).First() == "audio" ? ContentType.AudioTrack : 
-                                    g.Select(x => x.ContentType).First() == "podcast" ? ContentType.Podcast : ContentType.Unknown
-            })
-            .OrderByDescending(a => a.TotalMinutes)
-            .Take(10)
-            .ToListAsync();
-
-        // Top tracks - optimized query
-        var topTracks = await query
-            .Where(sh => sh.TrackName != null && sh.ArtistName != null)
-            .GroupBy(sh => new { sh.ArtistName, sh.TrackName })
-            .Select(g => new TrackStats
-            {
-                ArtistName = g.Key.ArtistName!,
-                TrackName = g.Key.TrackName!,
-                AlbumName = g.Select(x => x.AlbumName).FirstOrDefault(),
-                SpotifyUri = g.Select(x => x.SpotifyUri).FirstOrDefault(),
-                PlayCount = g.Count(),
-                TotalMinutes = g.Sum(x => x.MsPlayed) / 60000.0,
-                ContentType = g.Select(x => x.ContentType).First() == "audiobook" ? ContentType.Audiobook :
-                             g.Select(x => x.ContentType).First() == "audio" ? ContentType.AudioTrack : 
-                             g.Select(x => x.ContentType).First() == "podcast" ? ContentType.Podcast : ContentType.Unknown,
-                AveragePlayDuration = g.Average(x => x.MsPlayed) / 60000.0,
-                MostCommonCompletionStatus = PlaybackCompletionStatus.Unknown // Would need to add this field to schema
-            })
-            .OrderByDescending(t => t.TotalMinutes)
-            .Take(10)
-            .ToListAsync();
-
-        // Top albums - optimized query
-        var topAlbums = await query
-            .Where(sh => sh.AlbumName != null && sh.ArtistName != null)
-            .GroupBy(sh => new { sh.ArtistName, sh.AlbumName })
-            .Select(g => new AlbumStats
-            {
-                ArtistName = g.Key.ArtistName!,
-                AlbumName = g.Key.AlbumName!,
-                PlayCount = g.Count(),
-                TotalMinutes = g.Sum(x => x.MsPlayed) / 60000.0,
-                UniqueTracks = g.Select(x => x.TrackName).Distinct().Count()
-            })
-            .OrderByDescending(a => a.TotalMinutes)
-            .Take(10)
-            .ToListAsync();
+        // Removed TopArtists, TopTracks, TopAlbums from root level
+        // Music stats are in MusicStats.TopMusicArtists/Tracks/Albums
+        // Podcasts are in TopPodcasts
 
         // Time-based stats calculated in application
         var hourlyStats = await query
             .GroupBy(sh => sh.PlayedAt.Hour)
-            .Select(g => new { Hour = g.Key, Minutes = g.Sum(x => x.MsPlayed) / 60000.0 })
+            .Select(g => new { Hour = g.Key, Count = g.Count(), Minutes = g.Sum(x => x.MsPlayed) / 60000.0 })
             .OrderBy(x => x.Hour)
             .ToListAsync();
 
@@ -207,39 +154,241 @@ public class DatabaseStatsService
             .OrderBy(x => x.Date)
             .ToListAsync();
 
-        var monthlyStats = await query
-            .GroupBy(sh => new { Year = sh.PlayedAt.Year, Month = sh.PlayedAt.Month })
+        // Monthly stats grouped by month only (aggregating across all years)
+        var monthlyStatsByMonth = await query
+            .GroupBy(sh => sh.PlayedAt.Month)
             .Select(g => new { 
-                Year = g.Key.Year,
-                Month = g.Key.Month,
+                Month = g.Key,
+                Count = g.Count(),
                 Minutes = g.Sum(x => x.MsPlayed) / 60000.0 
             })
-            .OrderBy(x => x.Year)
-            .ThenBy(x => x.Month)
+            .OrderBy(x => x.Month)
             .ToListAsync();
+        
+        // Calculate total days for each month across all years in the date range
+        var monthDayCounts = new Dictionary<int, int>();
+        var currentDate = actualStartDate.Date;
+        while (currentDate <= actualEndDate.Date)
+        {
+            var month = currentDate.Month;
+            monthDayCounts[month] = monthDayCounts.GetValueOrDefault(month, 0) + 1;
+            currentDate = currentDate.AddDays(1);
+        }
+
+        // Day of week stats
+        var dayOfWeekStats = await query
+            .GroupBy(sh => sh.PlayedAt.DayOfWeek)
+            .Select(g => new { DayOfWeek = g.Key, Count = g.Count(), Minutes = g.Sum(x => x.MsPlayed) / 60000.0 })
+            .ToListAsync();
+
+        var dayNames = new[] { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" };
+
+        // Calculate number of occurrences of each day of week in the date range
+        var dayOfWeekCounts = new Dictionary<DayOfWeek, int>();
+        while (currentDate <= actualEndDate.Date)
+        {
+            var dayOfWeek = currentDate.DayOfWeek;
+            dayOfWeekCounts[dayOfWeek] = dayOfWeekCounts.GetValueOrDefault(dayOfWeek, 0) + 1;
+            currentDate = currentDate.AddDays(1);
+        }
 
         // Create time-based stats
         var timeBasedStats = new TimeBasedStats
         {
+            DayOfWeekStats = dayOfWeekStats.Select(x => new DayOfWeekStats
+            {
+                DayOfWeek = x.DayOfWeek,
+                DayName = dayNames[(int)x.DayOfWeek],
+                PlayCount = x.Count,
+                TotalMinutes = x.Minutes,
+                AverageMinutesPerOccurrence = x.Count > 0 ? x.Minutes / x.Count : 0,
+                AverageMinutesPerDay = dayOfWeekCounts.GetValueOrDefault(x.DayOfWeek, 0) > 0 
+                    ? x.Minutes / dayOfWeekCounts[x.DayOfWeek] 
+                    : 0
+            }).ToList(),
             HourOfDayStats = hourlyStats.Select(x => new HourOfDayStats
             {
                 Hour = x.Hour,
                 HourLabel = $"{x.Hour:00}:00",
                 TotalMinutes = x.Minutes,
-                PlayCount = 0, // Would need additional query
-                AverageMinutesPerOccurrence = 0
+                PlayCount = x.Count,
+                AverageMinutesPerOccurrence = x.Count > 0 ? x.Minutes / x.Count : 0,
+                AverageMinutesPerDay = daysInRange > 0 ? x.Minutes / daysInRange : 0
             }).ToList(),
-            MonthlyStats = monthlyStats.Select(x => new MonthlyStats
-            {
-                MonthYearLabel = $"{x.Year:0000}-{x.Month:00}",
-                TotalMinutes = x.Minutes,
-                PlayCount = 0, // Would need additional query
-                AverageMinutesPerDay = 0,
-                Month = x.Month,
-                Year = x.Year,
-                MonthName = ""
+            MonthlyStats = monthlyStatsByMonth.Select(x => {
+                var monthName = new DateTime(2000, x.Month, 1).ToString("MMMM");
+                var totalDays = monthDayCounts.GetValueOrDefault(x.Month, 0);
+                return new MonthlyStats
+                {
+                    MonthYearLabel = monthName,
+                    TotalMinutes = x.Minutes,
+                    PlayCount = x.Count,
+                    AverageMinutesPerDay = totalDays > 0 ? x.Minutes / totalDays : 0,
+                    Month = x.Month,
+                    Year = 0, // Not used when aggregating by month only
+                    MonthName = monthName
+                };
             }).ToList()
         };
+
+        // Playback behavior stats
+        var playbackBehavior = new PlaybackBehavior
+        {
+            ShufflePlays = await query.Where(x => x.Shuffle == true).CountAsync(),
+            SkippedPlays = await query.Where(x => x.Skipped == true).CountAsync(),
+            OfflinePlays = await query.Where(x => x.Offline == true).CountAsync(),
+            IncognitoPlays = 0 // Not available in current database schema
+        };
+
+        // Start/End reasons
+        var startReasons = await query
+            .Where(x => x.ReasonStart != null)
+            .GroupBy(x => x.ReasonStart!)
+            .Select(g => new { Reason = g.Key, Count = g.Count() })
+            .ToListAsync();
+        
+        foreach (var reason in startReasons)
+        {
+            playbackBehavior.StartReasons[reason.Reason] = reason.Count;
+        }
+
+        var endReasons = await query
+            .Where(x => x.ReasonEnd != null)
+            .GroupBy(x => x.ReasonEnd!)
+            .Select(g => new { Reason = g.Key, Count = g.Count() })
+            .ToListAsync();
+        
+        foreach (var reason in endReasons)
+        {
+            playbackBehavior.EndReasons[reason.Reason] = reason.Count;
+        }
+
+        // Music-only stats
+        var musicQuery = query.Where(sh => sh.ContentType == "audio");
+        var musicStats = new MusicStats();
+        
+        if (await musicQuery.AnyAsync())
+        {
+            var musicBasicStats = await musicQuery
+                .GroupBy(x => 1)
+                .Select(g => new {
+                    TotalTracks = g.Count(),
+                    TotalMinutes = g.Sum(x => x.MsPlayed) / 60000.0
+                })
+                .FirstAsync();
+
+            musicStats.TotalMusicTracks = musicBasicStats.TotalTracks;
+            musicStats.TotalMusicMinutes = musicBasicStats.TotalMinutes;
+            musicStats.UniqueMusicArtists = await musicQuery
+                .Where(x => x.ArtistName != null)
+                .Select(x => x.ArtistName)
+                .Distinct()
+                .CountAsync();
+            musicStats.UniqueMusicTracks = await musicQuery
+                .Where(x => x.TrackName != null && x.ArtistName != null)
+                .Select(x => new { x.ArtistName, x.TrackName })
+                .Distinct()
+                .CountAsync();
+            musicStats.UniqueMusicAlbums = await musicQuery
+                .Where(x => x.AlbumName != null)
+                .Select(x => x.AlbumName)
+                .Distinct()
+                .CountAsync();
+            musicStats.AverageMusicMinutesPerDay = daysInRange > 0 ? musicBasicStats.TotalMinutes / daysInRange : 0;
+
+            // Top music artists
+            musicStats.TopMusicArtists = await musicQuery
+                .Where(sh => sh.ArtistName != null)
+                .GroupBy(sh => sh.ArtistName)
+                .Select(g => new ArtistStats
+                {
+                    ArtistName = g.Key!,
+                    PlayCount = g.Count(),
+                    TotalMinutes = g.Sum(x => x.MsPlayed) / 60000.0,
+                    UniqueTracks = g.Select(x => x.TrackName).Distinct().Count(),
+                    UniqueAlbums = g.Where(x => x.AlbumName != null).Select(x => x.AlbumName).Distinct().Count(),
+                    PrimaryContentType = ContentType.AudioTrack
+                })
+                .OrderByDescending(a => a.TotalMinutes)
+                .Take(50)
+                .ToListAsync();
+
+            // Top music tracks
+            musicStats.TopMusicTracks = await musicQuery
+                .Where(sh => sh.TrackName != null && sh.ArtistName != null)
+                .GroupBy(sh => new { sh.ArtistName, sh.TrackName })
+                .Select(g => new TrackStats
+                {
+                    ArtistName = g.Key.ArtistName!,
+                    TrackName = g.Key.TrackName!,
+                    AlbumName = g.Select(x => x.AlbumName).FirstOrDefault(),
+                    SpotifyUri = g.Select(x => x.SpotifyUri).FirstOrDefault(),
+                    PlayCount = g.Count(),
+                    TotalMinutes = g.Sum(x => x.MsPlayed) / 60000.0,
+                    ContentType = ContentType.AudioTrack,
+                    AveragePlayDuration = g.Average(x => x.MsPlayed) / 60000.0,
+                    MostCommonCompletionStatus = PlaybackCompletionStatus.Unknown
+                })
+                .OrderByDescending(t => t.TotalMinutes)
+                .Take(50)
+                .ToListAsync();
+
+            // Top music albums
+            musicStats.TopMusicAlbums = await musicQuery
+                .Where(sh => sh.AlbumName != null && sh.ArtistName != null)
+                .GroupBy(sh => new { sh.ArtistName, sh.AlbumName })
+                .Select(g => new AlbumStats
+                {
+                    ArtistName = g.Key.ArtistName!,
+                    AlbumName = g.Key.AlbumName!,
+                    PlayCount = g.Count(),
+                    TotalMinutes = g.Sum(x => x.MsPlayed) / 60000.0,
+                    UniqueTracks = g.Select(x => x.TrackName).Distinct().Count()
+                })
+                .OrderByDescending(a => a.TotalMinutes)
+                .Take(50)
+                .ToListAsync();
+
+            // Music playback behavior
+            musicStats.MusicPlaybackBehavior = new PlaybackBehavior
+            {
+                ShufflePlays = await musicQuery.Where(x => x.Shuffle == true).CountAsync(),
+                SkippedPlays = await musicQuery.Where(x => x.Skipped == true).CountAsync(),
+                OfflinePlays = await musicQuery.Where(x => x.Offline == true).CountAsync()
+            };
+        }
+
+        // Top podcasts
+        var topPodcasts = await query
+            .Where(sh => sh.ContentType == "podcast" && sh.ShowName != null && sh.EpisodeName != null)
+            .GroupBy(sh => new { sh.ShowName, sh.EpisodeName })
+            .Select(g => new PodcastStats
+            {
+                ShowName = g.Key.ShowName!,
+                EpisodeName = g.Key.EpisodeName!,
+                SpotifyUri = g.Select(x => x.SpotifyUri).FirstOrDefault(),
+                PlayCount = g.Count(),
+                TotalMinutes = g.Sum(x => x.MsPlayed) / 60000.0
+            })
+            .OrderByDescending(p => p.TotalMinutes)
+            .Take(10)
+            .ToListAsync();
+
+        // Country stats
+        var countryStats = await query
+            .Where(sh => sh.PlayedInCountryCode != null)
+            .GroupBy(sh => sh.PlayedInCountryCode!)
+            .Select(g => new CountryStats
+            {
+                CountryCode = g.Key,
+                CountryName = g.Key, // Could be enhanced with country name lookup
+                PlayCount = g.Count(),
+                TotalMinutes = g.Sum(x => x.MsPlayed) / 60000.0,
+                UniqueTracks = g.Where(x => x.TrackName != null).Select(x => x.TrackName).Distinct().Count(),
+                UniqueArtists = g.Where(x => x.ArtistName != null).Select(x => x.ArtistName).Distinct().Count()
+            })
+            .OrderByDescending(c => c.TotalMinutes)
+            .ToListAsync();
 
         return new StatsOverview
         {
@@ -252,11 +401,11 @@ public class DatabaseStatsService
             EndDate = actualEndDate,
             ContentTypeBreakdown = contentTypeBreakdown,
             PlatformBreakdown = platformBreakdown,
-            TopArtists = topArtists,
-            TopTracks = topTracks,
-            TopAlbums = topAlbums,
+            TopPodcasts = topPodcasts,
             TimeBasedStats = timeBasedStats,
-            PlaybackBehavior = new PlaybackBehavior()
+            PlaybackBehavior = playbackBehavior,
+            MusicStats = musicStats,
+            CountryStats = countryStats
         };
     }
 

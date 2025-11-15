@@ -97,23 +97,21 @@ using (var scope = app.Services.CreateScope())
 
     try
     {
-        // Check if there are pending migrations
+        // Apply any pending migrations automatically
         var pendingMigrations = await context.Database.GetPendingMigrationsAsync();
         if (pendingMigrations.Any())
         {
-            logger.LogWarning("There are pending model changes. Please create a migration: dotnet ef migrations add <MigrationName>");
-            // For development, you can uncomment the line below to auto-migrate
-            // await context.Database.MigrateAsync();
+            logger.LogInformation("Applying {Count} pending migration(s): {Migrations}", 
+                pendingMigrations.Count(), string.Join(", ", pendingMigrations));
         }
-        else
-        {
-            await context.Database.MigrateAsync();
-            logger.LogInformation("Database migrations applied successfully");
-        }
+        
+        await context.Database.MigrateAsync();
+        logger.LogInformation("Database migrations applied successfully");
     }
     catch (Exception ex)
     {
         logger.LogError(ex, "An error occurred while applying database migrations");
+        throw; // Re-throw to prevent app from starting with an invalid database state
     }
 
     // Ensure UserData directory exists

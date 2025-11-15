@@ -53,6 +53,23 @@ services:
         condition: service_healthy
     command: dotnet watch run --project SpotMe.Web/SpotMe.Web.csproj --urls http://0.0.0.0:8080
 
+  # Frontend (SvelteKit with hot reload)
+  frontend:
+    image: node:20
+    container_name: spotme-frontend-dev
+    working_dir: /app
+    volumes:
+      - ./spotme-frontend:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:5000/api
+      - NODE_ENV=development
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    depends_on:
+      - app
+
   # File Browser - Web UI to browse uploaded files
   filebrowser:
     image: filebrowser/filebrowser:latest

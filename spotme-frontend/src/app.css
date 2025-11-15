@@ -50,7 +50,8 @@ p, span, div, h1, h2, h3, h4, h5, h6, li, td, th, label {
 }
 
 ::selection {
-    background-color: rgba(29, 185, 84, 0.3);
+    background-color: rgba(255, 255, 255, 0.2);
+    color: inherit;
 }
 
 /* Main App Container */
@@ -74,14 +75,29 @@ p, span, div, h1, h2, h3, h4, h5, h6, li, td, th, label {
 /* Secondary button style */
 .spotify-button-secondary {
     background-color: transparent;
-    border: 1px solid #1DB954;
+    border: none;
     color: #1DB954;
+    padding: 12px 32px;
+    border-radius: 50px;
+    font-weight: 700;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
 }
 
 .spotify-button-secondary:hover {
     background-color: rgba(29, 185, 84, 0.1);
     color: #fff;
     box-shadow: none;
+    text-decoration: none;
+}
+
+.spotify-button-secondary i {
+    font-size: 1.4rem;
 }
 
 /* Dark Container for Pages */
@@ -104,6 +120,10 @@ p, span, div, h1, h2, h3, h4, h5, h6, li, td, th, label {
     background: rgba(0, 0, 0, 0.3);
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
     text-align: center;
+}
+
+.spotify-content:has(.auth-card) {
+    text-align: left;
 }
 
 .spotify-content h1 {
@@ -157,7 +177,11 @@ p, span, div, h1, h2, h3, h4, h5, h6, li, td, th, label {
 }
 
 .hero-section {
-    padding: 2rem 0;
+    min-height: 65vh;
+    padding: 3rem 0;
+    overflow: visible;
+    display: flex;
+    align-items: center;
 }
 
 .hero-content h1 {
@@ -181,6 +205,7 @@ p, span, div, h1, h2, h3, h4, h5, h6, li, td, th, label {
     display: flex;
     justify-content: center;
     align-items: center;
+    overflow: visible;
 }
 
 .music-visualization {
@@ -190,6 +215,8 @@ p, span, div, h1, h2, h3, h4, h5, h6, li, td, th, label {
     display: flex;
     justify-content: center;
     align-items: center;
+    position: relative;
+    overflow: visible;
 }
 
 .vinyl-record {
@@ -202,6 +229,8 @@ p, span, div, h1, h2, h3, h4, h5, h6, li, td, th, label {
     align-items: center;
     box-shadow: 0 8px 32px rgba(29, 185, 84, 0.3);
     animation: spin 20s linear infinite;
+    position: relative;
+    z-index: 2;
 }
 
 .record-inner {
@@ -224,6 +253,236 @@ p, span, div, h1, h2, h3, h4, h5, h6, li, td, th, label {
     to { transform: rotate(360deg); }
 }
 
+/* Sound Waves */
+.sound-waves {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 200%;
+    height: 200%;
+    pointer-events: none;
+    z-index: 1;
+    overflow: visible;
+}
+
+/* Left waves - show only left quarter (270° to 360°/0°) - left vertical quarter */
+.sound-waves-left {
+    clip-path: polygon(0% 10%, 50% 10%, 50% 90%, 0% 90%);
+}
+
+/* Right waves - show only right quarter (90° to 180°) - right vertical quarter */
+.sound-waves-right {
+    clip-path: polygon(50% 10%, 100% 10%, 100% 90%, 50% 90%);
+}
+
+.sound-wave {
+    position: absolute;
+    opacity: 0;
+    animation: wave-pulse 3s ease-in-out infinite;
+    animation-delay: calc(var(--wave-index) * 0.2s);
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    /* Perfect circles to match record curvature */
+    aspect-ratio: 1 / 1;
+}
+
+/* Left waves - curved arcs showing left quarter only */
+.sound-waves-left .sound-wave {
+    border: 2px solid rgba(200, 200, 200, 0.3);
+    border-top: none;
+    border-bottom: none;
+    border-right: none;
+    border-top-left-radius: 50%;
+    border-bottom-left-radius: 50%;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+/* Right waves - curved arcs showing right quarter only */
+.sound-waves-right .sound-wave {
+    border: 2px solid rgba(200, 200, 200, 0.3);
+    border-top: none;
+    border-bottom: none;
+    border-left: none;
+    border-top-right-radius: 50%;
+    border-bottom-right-radius: 50%;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+}
+
+/* Varying wave sizes with non-uniform spacing */
+/* Wave sizes start from record size (~40% of container) and expand outward with same circular curvature */
+.sound-waves-left .sound-wave:nth-child(1),
+.sound-waves-right .sound-wave:nth-child(1) {
+    width: 42%;
+    height: 42%;
+    border-color: rgba(220, 220, 220, 0.3);
+}
+
+.sound-waves-left .sound-wave:nth-child(2),
+.sound-waves-right .sound-wave:nth-child(2) {
+    width: 58%;
+    height: 58%;
+    border-color: rgba(210, 210, 210, 0.25);
+}
+
+.sound-waves-left .sound-wave:nth-child(3),
+.sound-waves-right .sound-wave:nth-child(3) {
+    width: 75%;
+    height: 75%;
+    border-color: rgba(200, 200, 200, 0.2);
+}
+
+.sound-waves-left .sound-wave:nth-child(4),
+.sound-waves-right .sound-wave:nth-child(4) {
+    width: 95%;
+    height: 95%;
+    border-color: rgba(190, 190, 190, 0.15);
+}
+
+.sound-waves-left .sound-wave:nth-child(5),
+.sound-waves-right .sound-wave:nth-child(5) {
+    width: 118%;
+    height: 118%;
+    border-color: rgba(180, 180, 180, 0.12);
+}
+
+.sound-waves-left .sound-wave:nth-child(6),
+.sound-waves-right .sound-wave:nth-child(6) {
+    width: 145%;
+    height: 145%;
+    border-color: rgba(170, 170, 170, 0.1);
+}
+
+@keyframes wave-pulse {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.7);
+    }
+    50% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(1.3);
+    }
+}
+
+/* Features Section */
+.features-section {
+    background-color: var(--dark-card);
+}
+
+.feature-card {
+    background-color: var(--dark-bg);
+    border-radius: 12px;
+    padding: 2rem;
+    height: 100%;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    border: 1px solid var(--dark-border);
+}
+
+.feature-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.feature-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #1DB954 0%, #1ED760 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1.5rem;
+}
+
+.feature-icon i {
+    font-size: 2rem;
+    color: white;
+}
+
+.feature-card h3 {
+    color: var(--text-primary);
+}
+
+/* How It Works Section */
+.how-it-works-section {
+    background-color: var(--dark-bg);
+}
+
+.step-card {
+    text-align: center;
+    padding: 1.5rem;
+    height: 100%;
+}
+
+.step-number {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #1DB954 0%, #1ED760 100%);
+    color: white;
+    font-size: 1.5rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1.5rem;
+}
+
+.step-card h4 {
+    color: var(--text-primary);
+}
+
+/* Benefits Section */
+.benefits-section {
+    background-color: var(--dark-card);
+}
+
+.benefit-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #1DB954 0%, #1ED760 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.benefit-icon i {
+    font-size: 1.5rem;
+    color: white;
+}
+
+.benefit-item h4 {
+    color: var(--text-primary);
+}
+
+.benefits-visual {
+    font-size: 12rem;
+    color: rgba(29, 185, 84, 0.2);
+    opacity: 0.5;
+}
+
+/* CTA Section */
+.cta-section {
+    background: linear-gradient(135deg, var(--dark-bg) 0%, var(--dark-card) 100%);
+}
+
+.cta-actions {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
 /* Error Message */
 .error-message {
     margin-top: 20px;
@@ -237,6 +496,25 @@ p, span, div, h1, h2, h3, h4, h5, h6, li, td, th, label {
 /* Auth Card */
 .auth-card {
     width: 100%;
+    text-align: left;
+}
+
+.auth-card .form-label,
+.auth-card label {
+    text-align: left;
+}
+
+.auth-card .form-text,
+.auth-card small {
+    text-align: left;
+}
+
+.auth-card .btn,
+.auth-card button,
+.auth-card .spotify-button {
+    text-align: center;
+    justify-content: center;
+    display: flex;
 }
 
 /* Dark Theme Form Controls */
@@ -563,6 +841,29 @@ input.dark-input[type="date"]::-webkit-datetime-edit-year-field {
         width: 100%;
         justify-content: center;
     }
+    
+    .feature-card {
+        margin-bottom: 1.5rem;
+    }
+    
+    .step-card {
+        margin-bottom: 1.5rem;
+    }
+    
+    .benefits-visual {
+        font-size: 8rem;
+        margin-top: 2rem;
+    }
+    
+    .cta-actions {
+        flex-direction: column;
+    }
+    
+    .cta-actions .spotify-button,
+    .cta-actions .spotify-button-secondary {
+        width: 100%;
+        justify-content: center;
+    }
 }
 
 /* Ensure all Bootstrap typography uses light colors */
@@ -671,6 +972,13 @@ a:hover {
 /* Navbar */
 .navbar {
     background-color: var(--dark-card) !important;
+    position: relative;
+    z-index: 1000;
+}
+
+.navbar-transparent {
+    background-color: transparent !important;
+    background: rgba(18, 18, 18, 0.7) !important;
 }
 
 .navbar-brand {
@@ -686,5 +994,194 @@ a:hover {
 main {
     min-height: calc(100vh - 56px);
     padding-top: 1rem;
+}
+
+/* Form switch and radio button styling for dark theme */
+.form-check-input {
+    background-color: var(--dark-input) !important;
+    border-color: var(--dark-border) !important;
+}
+
+.form-check-input[type="checkbox"]:checked {
+    background-color: var(--spotify-green) !important;
+    border-color: var(--spotify-green) !important;
+}
+
+.form-check-input[type="radio"] {
+    border-color: var(--dark-border) !important;
+}
+
+.form-check-input[type="radio"]:checked {
+    background-color: var(--spotify-green) !important;
+    border-color: var(--spotify-green) !important;
+}
+
+.form-check-input:focus {
+    border-color: var(--spotify-green) !important;
+    box-shadow: 0 0 0 0.2rem var(--spotify-green-focus) !important;
+}
+
+.form-check-label {
+    color: var(--text-secondary) !important;
+    cursor: pointer;
+    user-select: none;
+}
+
+/* Dark table styling */
+.table-dark {
+    background-color: var(--dark-bg) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--dark-border) !important;
+    border-radius: 8px;
+    overflow: hidden;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.table-dark th {
+    background-color: var(--spotify-green) !important;
+    border-color: var(--dark-border) !important;
+    color: #ffffff !important;
+    font-weight: 700 !important;
+    font-size: 0.95rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 0.75rem 1.25rem !important;
+    vertical-align: middle !important;
+}
+
+.table-dark th:first-child {
+    border-top-left-radius: 8px;
+}
+
+.table-dark th:last-child {
+    border-top-right-radius: 8px;
+}
+
+.table-dark td {
+    border-color: var(--dark-border) !important;
+    color: var(--text-primary) !important;
+    padding: 1rem 1.25rem !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    vertical-align: middle !important;
+}
+
+/* Zebra striping - alternating row colors */
+.table-dark tbody tr:nth-child(odd) {
+    background-color: var(--dark-bg) !important;
+}
+
+.table-dark tbody tr:nth-child(even) {
+    background-color: rgba(255, 255, 255, 0.03) !important;
+}
+
+/* Smooth hover animation */
+.table-dark tbody tr {
+    transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
+                box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+    position: relative;
+}
+
+.table-dark tbody tr:hover {
+    background-color: rgba(29, 185, 84, 0.2) !important;
+    box-shadow: 0 4px 12px rgba(29, 185, 84, 0.25);
+    transform: translateX(4px);
+}
+
+.table-dark tbody tr:hover td {
+    color: #ffffff !important;
+}
+
+/* Rounded corners for first and last rows */
+.table-dark tbody tr:first-child td:first-child {
+    border-top-left-radius: 0;
+}
+
+.table-dark tbody tr:first-child td:last-child {
+    border-top-right-radius: 0;
+}
+
+.table-dark tbody tr:last-child td:first-child {
+    border-bottom-left-radius: 8px;
+}
+
+.table-dark tbody tr:last-child td:last-child {
+    border-bottom-right-radius: 8px;
+}
+
+/* Table wrapper styling for rounded corners */
+.table-responsive {
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.table-responsive .table-dark {
+    margin-bottom: 0;
+}
+
+/* Scrollable top lists - show ~10 rows, rest scrollable */
+.stats-container .table-responsive {
+    position: relative;
+    overflow-x: auto;
+}
+
+/* Make table display as block to enable tbody scrolling */
+.stats-container .table-responsive .table-dark {
+    display: block;
+    max-height: 550px;
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+/* Fixed header - display as block */
+.stats-container .table-responsive .table-dark thead {
+    display: block;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    width: 100%;
+}
+
+.stats-container .table-responsive .table-dark thead tr {
+    display: table;
+    width: 100%;
+    table-layout: fixed;
+}
+
+/* Scrollable body - display as block */
+.stats-container .table-responsive .table-dark tbody {
+    display: block;
+    max-height: 500px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    width: 100%;
+}
+
+.stats-container .table-responsive .table-dark tbody tr {
+    display: table;
+    width: 100%;
+    table-layout: fixed;
+}
+
+/* Custom scrollbar for scrollable tbody */
+.stats-container .table-responsive .table-dark tbody::-webkit-scrollbar {
+    width: 8px;
+}
+
+.stats-container .table-responsive .table-dark tbody::-webkit-scrollbar-track {
+    background: var(--dark-bg);
+    border-radius: 4px;
+}
+
+.stats-container .table-responsive .table-dark tbody::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+}
+
+.stats-container .table-responsive .table-dark tbody::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
 }
 

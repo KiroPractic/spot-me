@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.Components.Forms;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using SpotMe.Web.Persistency;
+using SpotMe.Web.Domain;
+using System.Security.Cryptography;
 
 namespace SpotMe.Web.Services;
 
@@ -144,63 +146,91 @@ public class UserDataService
                 return result;
             }
 
+            // Calculate file hash to detect duplicate uploads
+            var fileHash = ComputeFileHash(fileContent);
+
             // Use a new scope for database operations to avoid disposed context issues
             using (var scope = _serviceScopeFactory.CreateScope())
             {
                 var context = scope.ServiceProvider.GetRequiredService<DatabaseContext>();
-
-                // Check if user already has data
-                var existingCount = await context.StreamingHistory
-                    .Where(sh => sh.UserId == userGuid)
-                    .CountAsync();
-
-                if (existingCount > 0)
+                
+                // Check if this file has already been uploaded by this user
+                var existingUpload = await context.UploadedFiles
+                    .FirstOrDefaultAsync(uf => uf.UserId == userGuid && uf.FileHash == fileHash);
+                
+                if (existingUpload != null)
                 {
-                    result.Success = true;
-                    result.AlreadyExists = true;
-                    result.ExistingEntryCount = existingCount;
-                    result.Message = $"User already has {existingCount} entries in database";
+                    _logger.LogWarning("User {UserId} attempted to upload duplicate file {FileName} (hash: {FileHash}). Previously uploaded on {UploadDate}",
+                        userId, file.Name, fileHash, existingUpload.UploadedAt);
+                    
+                    result.Success = false;
+                    result.Message = $"This file has already been uploaded on {existingUpload.UploadedAt:yyyy-MM-dd HH:mm:ss}. Please upload a different file.";
                     return result;
                 }
 
-                // Convert and save to database
+                // Create UploadedFile record first to get its ID
+                var uploadedFile = new UploadedFile
+                {
+                    UserId = userGuid,
+                    FileName = file.Name,
+                    FileHash = fileHash,
+                    FileSize = file.Size,
+                    UploadedAt = DateTime.UtcNow
+                };
+                
+                context.UploadedFiles.Add(uploadedFile);
+                await context.SaveChangesAsync();
+                
+                // Convert and save to database with optimized bulk insert
                 var dbEntries = new List<StreamingHistoryEntry>();
-                var batchSize = 1000;
+                var batchSize = 10000;
                 var processed = 0;
 
-                foreach (var jsonEntry in jsonEntries)
-                {
-                    try
-                    {
-                        var dbEntry = ConvertJsonToDbEntry(userGuid, jsonEntry);
-                        dbEntries.Add(dbEntry);
-                        processed++;
+                // Disable change tracking for bulk inserts (significant performance improvement)
+                var originalAutoDetectChanges = context.ChangeTracker.AutoDetectChangesEnabled;
+                context.ChangeTracker.AutoDetectChangesEnabled = false;
 
-                        // Batch insert for performance
-                        if (dbEntries.Count >= batchSize)
+                try
+                {
+                    foreach (var jsonEntry in jsonEntries)
+                    {
+                        try
                         {
-                            context.StreamingHistory.AddRange(dbEntries);
-                            await context.SaveChangesAsync();
-                            result.SavedCount += dbEntries.Count;
-                            dbEntries.Clear();
-                            
-                            _logger.LogDebug("Saved batch of {BatchSize} entries for user {UserId}. Total: {Total}", 
-                                batchSize, userId, result.SavedCount);
+                            var dbEntry = ConvertJsonToDbEntry(userGuid, uploadedFile.Id, jsonEntry);
+                            dbEntries.Add(dbEntry);
+                            processed++;
+
+                            // Batch insert for performance
+                            if (dbEntries.Count >= batchSize)
+                            {
+                                context.StreamingHistory.AddRange(dbEntries);
+                                await context.SaveChangesAsync();
+                                result.SavedCount += dbEntries.Count;
+                                dbEntries.Clear();
+                                
+                                _logger.LogDebug("Saved batch of {BatchSize} entries for user {UserId}. Total: {Total}", 
+                                    batchSize, userId, result.SavedCount);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Failed to convert entry {Index} for user {UserId}", processed, userId);
+                            result.ErrorCount++;
                         }
                     }
-                    catch (Exception ex)
+
+                    // Save remaining entries
+                    if (dbEntries.Any())
                     {
-                        _logger.LogWarning(ex, "Failed to convert entry {Index} for user {UserId}", processed, userId);
-                        result.ErrorCount++;
+                        context.StreamingHistory.AddRange(dbEntries);
+                        await context.SaveChangesAsync();
+                        result.SavedCount += dbEntries.Count;
                     }
                 }
-
-                // Save remaining entries
-                if (dbEntries.Any())
+                finally
                 {
-                    context.StreamingHistory.AddRange(dbEntries);
-                    await context.SaveChangesAsync();
-                    result.SavedCount += dbEntries.Count;
+                    // Restore original change tracking setting
+                    context.ChangeTracker.AutoDetectChangesEnabled = originalAutoDetectChanges;
                 }
             }
 
@@ -304,7 +334,7 @@ public class UserDataService
     /// <summary>
     /// Convert JSON streaming entry to database entity
     /// </summary>
-    private StreamingHistoryEntry ConvertJsonToDbEntry(Guid userId, Models.StreamingHistoryEntry jsonEntry)
+    private StreamingHistoryEntry ConvertJsonToDbEntry(Guid userId, Guid uploadedFileId, Models.StreamingHistoryEntry jsonEntry)
     {
         // Parse timestamp from Spotify JSON 
         // Convert to DateTime with Unspecified kind for PostgreSQL 'timestamp without time zone'
@@ -325,6 +355,7 @@ public class UserDataService
             msPlayed: jsonEntry.MsPlayed,
             platform: jsonEntry.Platform ?? "unknown",
             contentType: contentType,
+            uploadedFileId: uploadedFileId,
             countryCode: jsonEntry.PlayedInCountryCode,
             spotifyUri: jsonEntry.SpotifyTrackUri ?? jsonEntry.SpotifyEpisodeUri,
             trackName: trackName,
@@ -338,6 +369,16 @@ public class UserDataService
             shuffle: jsonEntry.Shuffle,
             offline: jsonEntry.Offline
         );
+    }
+
+    /// <summary>
+    /// Compute SHA256 hash of file content for duplicate detection
+    /// </summary>
+    private static string ComputeFileHash(byte[] fileContent)
+    {
+        using var sha256 = SHA256.Create();
+        var hashBytes = sha256.ComputeHash(fileContent);
+        return Convert.ToHexString(hashBytes).ToLowerInvariant();
     }
 
     /// <summary>

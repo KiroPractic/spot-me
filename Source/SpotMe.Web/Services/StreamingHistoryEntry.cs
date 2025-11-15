@@ -7,6 +7,9 @@ public sealed class StreamingHistoryEntry : Entity
     // User reference
     public Guid UserId { get; private set; }
     
+    // Uploaded file reference
+    public Guid UploadedFileId { get; private set; }
+    
     // Core playback data
     public DateTime PlayedAt { get; private set; }
     public long MsPlayed { get; private set; }
@@ -45,6 +48,7 @@ public sealed class StreamingHistoryEntry : Entity
         long msPlayed,
         string platform,
         string contentType,
+        Guid uploadedFileId,
         string? countryCode = null,
         string? spotifyUri = null,
         string? trackName = null,
@@ -59,6 +63,7 @@ public sealed class StreamingHistoryEntry : Entity
         bool? offline = null)
     {
         UserId = userId;
+        UploadedFileId = uploadedFileId;
         PlayedAt = playedAt;
         MsPlayed = msPlayed;
         Platform = platform;

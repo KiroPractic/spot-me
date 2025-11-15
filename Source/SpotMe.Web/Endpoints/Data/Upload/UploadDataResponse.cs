@@ -6,5 +6,7 @@ public class UploadDataResponse
     public string Message { get; set; } = string.Empty;
     public string? FileName { get; set; }
     public int? EntryCount { get; set; }
+    public int? SkippedCount { get; set; }
+    public int? TotalProcessed { get; set; }
 }
 

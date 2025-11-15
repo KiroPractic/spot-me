@@ -22,6 +22,46 @@ namespace SpotMe.Web.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("SpotMe.Web.Domain.UploadedFile", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FileHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<long>("FileSize")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("IX_UploadedFiles_UserId");
+
+                    b.HasIndex("UserId", "FileHash")
+                        .IsUnique()
+                        .HasDatabaseName("IX_UploadedFiles_User_FileHash_Unique");
+
+                    b.ToTable("UploadedFiles", (string)null);
+                });
+
             modelBuilder.Entity("SpotMe.Web.Domain.Users.SpotifyToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -91,24 +131,24 @@ namespace SpotMe.Web.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<string>("AlbumName")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
 
                     b.Property<string>("ArtistName")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
 
                     b.Property<string>("ContentType")
                         .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<DateTime>("CreatedOn")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("EpisodeName")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
 
                     b.Property<long>("MsPlayed")
                         .HasColumnType("bigint");
@@ -118,8 +158,8 @@ namespace SpotMe.Web.Migrations
 
                     b.Property<string>("Platform")
                         .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
 
                     b.Property<DateTime>("PlayedAt")
                         .HasColumnType("timestamp without time zone");
@@ -129,16 +169,16 @@ namespace SpotMe.Web.Migrations
                         .HasColumnType("character varying(5)");
 
                     b.Property<string>("ReasonEnd")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("ReasonStart")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("ShowName")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
 
                     b.Property<bool?>("Shuffle")
                         .HasColumnType("boolean");
@@ -147,12 +187,15 @@ namespace SpotMe.Web.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<string>("SpotifyUri")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<string>("TrackName")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
+
+                    b.Property<string>("TrackName")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid>("UploadedFileId")
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
@@ -163,8 +206,8 @@ namespace SpotMe.Web.Migrations
                         .HasDatabaseName("IX_StreamingHistory_SpotifyUri")
                         .HasFilter("\"SpotifyUri\" IS NOT NULL");
 
-                    b.HasIndex("UserId", "PlayedAt")
-                        .HasDatabaseName("IX_StreamingHistory_User_PlayedAt");
+                    b.HasIndex("UploadedFileId")
+                        .HasDatabaseName("IX_StreamingHistory_UploadedFileId");
 
                     b.HasIndex("UserId", "ArtistName", "PlayedAt")
                         .HasDatabaseName("IX_StreamingHistory_User_Artist_PlayedAt")
@@ -189,6 +232,15 @@ namespace SpotMe.Web.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("SpotMe.Web.Services.StreamingHistoryEntry", b =>
+                {
+                    b.HasOne("SpotMe.Web.Domain.UploadedFile", null)
+                        .WithMany()
+                        .HasForeignKey("UploadedFileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

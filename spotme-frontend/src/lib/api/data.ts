@@ -1,6 +1,7 @@
 import { apiRequest, apiRequestFormData } from './client';
 
 export interface FileInfo {
+	fileId?: string;
 	fileName: string;
 	entryCount: number;
 	dateRange?: string;
@@ -32,10 +33,10 @@ export const dataApi = {
 		return apiRequestFormData<UploadResponse>('/data/upload', formData);
 	},
 	
-	deleteFile: async (fileName: string): Promise<DeleteFileResponse> => {
+	deleteFile: async (fileId?: string, fileName?: string): Promise<DeleteFileResponse> => {
 		return apiRequest<DeleteFileResponse>('/data/delete', {
 			method: 'POST',
-			body: JSON.stringify({ fileName })
+			body: JSON.stringify({ fileId, fileName })
 		});
 	}
 };
