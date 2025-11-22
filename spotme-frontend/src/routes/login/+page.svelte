@@ -5,6 +5,8 @@
 	import { authApi } from '$lib/api/auth';
 	import { type ApiError } from '$lib/api/client';
 	
+	export let params: Record<string, string> = {};
+	
 	let email = '';
 	let password = '';
 	let showPassword = false;

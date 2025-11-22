@@ -10,6 +10,7 @@
 		Title,
 		Tooltip,
 		Legend,
+		Filler,
 		type ChartConfiguration
 	} from 'chart.js';
 	import type { DayOfWeekStats } from '$lib/api/stats';
@@ -34,7 +35,8 @@
 			LineElement,
 			Title,
 			Tooltip,
-			Legend
+			Legend,
+			Filler
 		);
 
 		// Create a map for quick lookup (sorting doesn't affect display order)
@@ -48,7 +50,8 @@
 		dayOrder.forEach((day, index) => {
 			const stat = dataMap.get(day);
 			labels.push(dayLabels[index]); // Use index to get correct label (Monday first)
-			minutes.push(stat ? stat.averageMinutesPerDay : 0);
+			const minutesValue = stat ? stat.averageMinutesPerDay : 0;
+			minutes.push(minutesValue);
 		});
 
 		const config: ChartConfiguration<'line'> = {
@@ -80,16 +83,7 @@
 				maintainAspectRatio: false,
 				plugins: {
 					legend: {
-						display: true,
-						position: 'top',
-						labels: {
-							color: '#ffffff',
-							font: {
-								size: 14,
-								weight: '500'
-							},
-							padding: 15
-						}
+						display: false
 					},
 					title: {
 						display: true,
@@ -189,7 +183,8 @@
 		const minutes: number[] = [];
 		dayOrder.forEach((day) => {
 			const stat = dataMap.get(day);
-			minutes.push(stat ? stat.averageMinutesPerDay : 0);
+			const minutesValue = stat ? stat.averageMinutesPerDay : 0;
+			minutes.push(minutesValue);
 		});
 
 		chartInstance.data.datasets[0].data = minutes;

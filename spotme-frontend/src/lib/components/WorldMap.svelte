@@ -172,8 +172,6 @@
 							path.style.fill = '#1a1a1a';
 						}
 					});
-					
-					console.log(`Applied colors to ${allPaths.length} regions`);
 				};
 				
 				// Try multiple times with increasing delays

@@ -7,6 +7,8 @@
 	import Navbar from '$lib/components/Navbar.svelte';
 	import Footer from '$lib/components/Footer.svelte';
 	
+	export let params: Record<string, string> = {};
+	
 	$: isAuthenticated = $authStore.isAuthenticated;
 
 	// Load jsvectormap CSS only on client side

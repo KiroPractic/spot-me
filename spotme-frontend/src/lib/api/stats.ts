@@ -38,6 +38,19 @@ export interface AlbumStats {
 	uniqueTracks: number;
 }
 
+export interface PlaybackBehavior {
+	shufflePlays: number;
+	skippedPlays: number;
+	offlinePlays: number;
+	incognitoPlays: number;
+	startReasons: Record<string, number>;
+	endReasons: Record<string, number>;
+	completedPlays: number;
+	partiallyCompletedPlays: number;
+	barelyPlayedPlays: number;
+	completionStatusBreakdown: Record<string, number>;
+}
+
 export interface MusicStats {
 	totalMusicTracks: number;
 	totalMusicMinutes: number;
@@ -47,6 +60,7 @@ export interface MusicStats {
 	topMusicArtists?: ArtistStats[];
 	topMusicTracks?: TrackStats[];
 	topMusicAlbums?: AlbumStats[];
+	musicPlaybackBehavior?: PlaybackBehavior;
 }
 
 export interface DayOfWeekStats {

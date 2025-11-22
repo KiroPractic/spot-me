@@ -4,6 +4,8 @@
 	import { authStore } from '$lib/stores/auth';
 	import { spotifyApi, type Playlist } from '$lib/api/spotify';
 	
+	export let params: Record<string, string> = {};
+	
 	let playlists: Playlist[] = [];
 	let authUrl = '';
 	let loading = true;

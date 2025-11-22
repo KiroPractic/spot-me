@@ -185,6 +185,7 @@ public class DatabaseStatsService
 
         // Calculate number of occurrences of each day of week in the date range
         var dayOfWeekCounts = new Dictionary<DayOfWeek, int>();
+        currentDate = actualStartDate.Date; // Reset currentDate for day of week calculation
         while (currentDate <= actualEndDate.Date)
         {
             var dayOfWeek = currentDate.DayOfWeek;
@@ -349,13 +350,22 @@ public class DatabaseStatsService
                 .Take(50)
                 .ToListAsync();
 
-            // Music playback behavior
-            musicStats.MusicPlaybackBehavior = new PlaybackBehavior
+            // Music playback behavior - skipped vs not skipped
+            var totalMusicPlays = await musicQuery.CountAsync();
+            var skippedPlays = await musicQuery.Where(x => x.Skipped == true).CountAsync();
+            var notSkippedPlays = totalMusicPlays - skippedPlays;
+
+            var musicPlaybackBehavior = new PlaybackBehavior
             {
                 ShufflePlays = await musicQuery.Where(x => x.Shuffle == true).CountAsync(),
-                SkippedPlays = await musicQuery.Where(x => x.Skipped == true).CountAsync(),
-                OfflinePlays = await musicQuery.Where(x => x.Offline == true).CountAsync()
+                SkippedPlays = skippedPlays,
+                OfflinePlays = await musicQuery.Where(x => x.Offline == true).CountAsync(),
+                CompletedPlays = notSkippedPlays, // Using this field to represent "not skipped"
+                PartiallyCompletedPlays = 0,
+                BarelyPlayedPlays = 0
             };
+
+            musicStats.MusicPlaybackBehavior = musicPlaybackBehavior;
         }
 
         // Top podcasts

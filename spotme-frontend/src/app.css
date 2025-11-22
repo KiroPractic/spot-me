@@ -664,6 +664,11 @@ label {
     border-color: var(--dark-border) !important;
 }
 
+/* Global chart container styling */
+.chart-container {
+    border: 1px solid var(--dark-border) !important;
+}
+
 /* Playlist Page Styles */
 .playlists-container {
     max-width: 1200px;

@@ -10,6 +10,7 @@
 		Title,
 		Tooltip,
 		Legend,
+		Filler,
 		type ChartConfiguration
 	} from 'chart.js';
 	import type { HourOfDayStats } from '$lib/api/stats';
@@ -30,7 +31,8 @@
 			LineElement,
 			Title,
 			Tooltip,
-			Legend
+			Legend,
+			Filler
 		);
 
 		// Create a map for quick lookup
@@ -76,16 +78,7 @@
 				maintainAspectRatio: false,
 				plugins: {
 					legend: {
-						display: true,
-						position: 'top',
-						labels: {
-							color: '#ffffff',
-							font: {
-								size: 14,
-								weight: '500'
-							},
-							padding: 15
-						}
+						display: false
 					},
 					title: {
 						display: true,

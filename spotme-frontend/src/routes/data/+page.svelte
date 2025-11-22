@@ -5,6 +5,8 @@
 	import { dataApi, type FileInfo } from '$lib/api/data';
 	import { type ApiError } from '$lib/api/client';
 	
+	export let params: Record<string, string> = {};
+	
 	let files: FileInfo[] = [];
 	let loading = true;
 	let uploading = false;

@@ -3,6 +3,8 @@
 	import { goto } from '$app/navigation';
 	import { authStore } from '$lib/stores/auth';
 
+	export let params: Record<string, string> = {};
+
 	onMount(() => {
 		if ($authStore.isAuthenticated) {
 			goto('/data');

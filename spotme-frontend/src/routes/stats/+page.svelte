@@ -7,6 +7,9 @@
 	import HourOfDayChart from '$lib/components/HourOfDayChart.svelte';
 	import MonthlyChart from '$lib/components/MonthlyChart.svelte';
 	import WorldMap from '$lib/components/WorldMap.svelte';
+	import PlaybackBehaviorPieChart from '$lib/components/PlaybackBehaviorPieChart.svelte';
+	
+	export let params: Record<string, string> = {};
 	
 	let startDate = '';
 	let endDate = '';
@@ -333,6 +336,10 @@
 						</div>
 					</div>
 				</div>
+				
+				{#if stats.musicStats.musicPlaybackBehavior}
+					<PlaybackBehaviorPieChart data={stats.musicStats.musicPlaybackBehavior} />
+				{/if}
 				
 				{#if stats.musicStats.topMusicArtists && stats.musicStats.topMusicArtists.length > 0}
 					<h3 class="mb-3">Most Listened Artists</h3>
