@@ -1,4 +1,20 @@
-# Build stage
+# Frontend build stage
+FROM node:20 AS frontend-build
+WORKDIR /app/frontend
+
+# Copy frontend package files
+COPY spotme-frontend/package*.json ./
+
+# Install dependencies
+RUN npm ci
+
+# Copy frontend source
+COPY spotme-frontend/ .
+
+# Build frontend
+RUN npm run build
+
+# Backend build stage
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
@@ -11,6 +27,9 @@ RUN dotnet restore SpotMe.Web/SpotMe.Web.csproj
 
 # Copy source code
 COPY Source/ .
+
+# Copy frontend build output to wwwroot
+COPY --from=frontend-build /app/frontend/build ./SpotMe.Web/wwwroot/
 
 # Build the application
 RUN dotnet build SpotMe.Web/SpotMe.Web.csproj -c Release -o /app/build

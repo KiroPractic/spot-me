@@ -143,6 +143,95 @@ If a port is already in use, you can:
 - **Authentication**: JWT-based authentication
 - **File Storage**: User-uploaded Spotify data files stored in Docker volumes
 
+## Production Deployment (Azure)
+
+### Overview
+
+For production deployment on Azure App Service, the frontend is built as static files and served from the backend's `wwwroot` directory. Both frontend and backend run on the same domain, so CORS is not required.
+
+### Build Process
+
+1. **Build Frontend**:
+   ```bash
+   cd spotme-frontend
+   npm install
+   npm run build
+   ```
+
+2. **Copy Frontend to Backend**:
+   ```bash
+   # Copy build output to wwwroot
+   cp -r spotme-frontend/build/* Source/SpotMe.Web/wwwroot/
+   ```
+
+3. **Build Backend**:
+   ```bash
+   dotnet publish Source/SpotMe.Web/SpotMe.Web.csproj -c Release
+   ```
+
+4. **Deploy to Azure**: Deploy the published output to Azure App Service
+
+### Required Environment Variables (Azure App Settings)
+
+Configure these in Azure Portal under **Configuration > Application settings**:
+
+#### Required Settings
+
+- **`Jwt__SecretKey`** (required)
+  - Minimum 32 characters
+  - Used for JWT token signing
+  - Example: `YourSuperSecretKeyThatShouldBeAtLeast32CharactersLong!`
+
+- **`ConnectionStrings__Database`** (required)
+  - PostgreSQL connection string
+  - Format: `Host=<host>;Database=<db>;Username=<user>;Password=<password>;Port=5432`
+  - For Azure Database for PostgreSQL: `Host=<server>.postgres.database.azure.com;Database=<db>;Username=<user>;Password=<password>;Port=5432;Ssl Mode=Require`
+
+- **`Spotify__ClientId`** (required for Spotify integration)
+  - Spotify application client ID
+
+- **`Spotify__ClientSecret`** (required for Spotify integration)
+  - Spotify application client secret
+
+- **`Spotify__RedirectUri`** (required for Spotify integration)
+  - Must match the redirect URI configured in your Spotify app
+  - Format: `https://yourapp.azurewebsites.net/api/spotify/callback`
+
+#### Optional Settings
+
+- **`Jwt__Issuer`** (optional, defaults to "SpotMe")
+  - JWT token issuer
+
+- **`Jwt__Audience`** (optional, defaults to "SpotMeUsers")
+  - JWT token audience
+
+- **`Jwt__ExpirationMinutes`** (optional, defaults to 60)
+  - JWT token expiration time in minutes
+
+### GitHub Actions Deployment
+
+For automated deployment, create a GitHub Actions workflow (`.github/workflows/deploy.yml`) that:
+
+1. Builds the frontend: `cd spotme-frontend && npm install && npm run build`
+2. Copies frontend build output to `Source/SpotMe.Web/wwwroot/`
+3. Builds the backend: `dotnet publish`
+4. Deploys to Azure App Service
+
+### Docker Production Deployment
+
+If using Docker on Azure Container Instances or Azure Container Apps:
+
+1. Use `docker-compose.prod.yml` for production
+2. Set all environment variables in the compose file or via `.env` file
+3. The Dockerfile automatically builds the frontend and includes it in the image
+
+### Notes
+
+- CORS is disabled in production since frontend and backend are on the same domain
+- The backend serves `index.html` as a fallback for SPA routing
+- All sensitive values should be stored in Azure App Settings, not in `appsettings.Production.json`
+- Database migrations are automatically applied on application startup
+
 ## Additional Documentation
 
 - **HOW_TO_RUN.md**: Detailed setup instructions (legacy, now using Docker)

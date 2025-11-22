@@ -121,7 +121,7 @@ public class DatabaseStatsService
             }
         }
 
-        // Platform breakdown
+        // Platform breakdown - aggregate similar platforms
         var platformStats = await query
             .GroupBy(sh => sh.Platform)
             .Select(g => new { Platform = g.Key, Count = g.Count(), Minutes = g.Sum(x => x.MsPlayed) / 60000.0 })
@@ -130,8 +130,19 @@ public class DatabaseStatsService
         var platformBreakdown = new PlatformBreakdown();
         foreach (var stat in platformStats)
         {
-            platformBreakdown.PlatformUsage[stat.Platform] = stat.Count;
-            platformBreakdown.PlatformMinutes[stat.Platform] = stat.Minutes;
+            var normalizedPlatform = NormalizePlatformName(stat.Platform);
+            
+            // Aggregate counts and minutes for normalized platform names
+            if (platformBreakdown.PlatformUsage.ContainsKey(normalizedPlatform))
+            {
+                platformBreakdown.PlatformUsage[normalizedPlatform] += stat.Count;
+                platformBreakdown.PlatformMinutes[normalizedPlatform] += stat.Minutes;
+            }
+            else
+            {
+                platformBreakdown.PlatformUsage[normalizedPlatform] = stat.Count;
+                platformBreakdown.PlatformMinutes[normalizedPlatform] = stat.Minutes;
+            }
         }
 
         // Removed TopArtists, TopTracks, TopAlbums from root level
@@ -417,6 +428,58 @@ public class DatabaseStatsService
             MusicStats = musicStats,
             CountryStats = countryStats
         };
+    }
+
+    /// <summary>
+    /// Normalize platform names into broader categories
+    /// </summary>
+    private string NormalizePlatformName(string platform)
+    {
+        if (string.IsNullOrWhiteSpace(platform))
+            return "Other";
+
+        var platformLower = platform.ToLowerInvariant();
+
+        // Android devices
+        if (platformLower.Contains("android"))
+            return "Android";
+
+        // iOS devices
+        if (platformLower.Contains("iphone") || platformLower == "ios")
+            return "iPhone";
+        if (platformLower.Contains("ipad"))
+            return "iPad";
+
+        // Windows devices
+        if (platformLower.Contains("windows"))
+            return "Windows";
+
+        // macOS devices
+        if (platformLower.Contains("mac") || platformLower.Contains("osx") || platformLower.Contains("macos"))
+            return "Mac";
+
+        // Linux
+        if (platformLower.Contains("linux"))
+            return "Linux";
+
+        // Web player
+        if (platformLower.Contains("web") || platformLower.Contains("browser") || platformLower == "web player")
+            return "Web Player";
+
+        // Desktop (generic)
+        if (platformLower.Contains("desktop"))
+            return "Desktop";
+
+        // Mobile (generic)
+        if (platformLower.Contains("mobile"))
+            return "Mobile";
+
+        // Tablet (generic)
+        if (platformLower.Contains("tablet"))
+            return "Tablet";
+
+        // Sum all unrecognized platforms into "Other"
+        return "Other";
     }
 
     /// <summary>

@@ -12,16 +12,19 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container
 builder.Services.AddHttpClient();
 
-// Add CORS services
-builder.Services.AddCors(options =>
+// Add CORS services (only needed in development when frontend runs separately)
+if (builder.Environment.IsDevelopment())
 {
-    options.AddDefaultPolicy(policy =>
+    builder.Services.AddCors(options =>
     {
-        policy.AllowAnyOrigin()
-              .AllowAnyMethod()
-              .AllowAnyHeader();
+        options.AddDefaultPolicy(policy =>
+        {
+            policy.AllowAnyOrigin()
+                  .AllowAnyMethod()
+                  .AllowAnyHeader();
+        });
     });
-});
+}
 
 // Configure JWT Authentication
 var jwtSecretKey = builder.Configuration["Jwt:SecretKey"] ?? throw new InvalidOperationException("JWT SecretKey not configured");
@@ -133,8 +136,11 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 
-// CORS
-app.UseCors();
+// CORS (only in development - not needed in production since same domain)
+if (app.Environment.IsDevelopment())
+{
+    app.UseCors();
+}
 
 // Authentication and Authorization
 app.UseAuthentication();
@@ -155,8 +161,11 @@ if (app.Environment.IsDevelopment())
 // Health check endpoint
 app.MapGet("/health", () => "Healthy");
 
-// Note: Frontend is now served by SvelteKit (separate process in development)
-// In production, you can build SvelteKit and serve it from wwwroot if needed
-// For now, we only serve the API - the frontend runs separately
+// SPA fallback: serve index.html for client-side routing (production only)
+// In development, frontend runs separately via SvelteKit dev server
+if (!app.Environment.IsDevelopment())
+{
+    app.MapFallbackToFile("index.html");
+}
 
 app.Run();

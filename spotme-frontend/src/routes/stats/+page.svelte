@@ -8,6 +8,8 @@
 	import MonthlyChart from '$lib/components/MonthlyChart.svelte';
 	import WorldMap from '$lib/components/WorldMap.svelte';
 	import PlaybackBehaviorPieChart from '$lib/components/PlaybackBehaviorPieChart.svelte';
+	import PlatformPieChart from '$lib/components/PlatformPieChart.svelte';
+	import ShufflePieChart from '$lib/components/ShufflePieChart.svelte';
 	
 	export let params: Record<string, string> = {};
 	
@@ -337,8 +339,18 @@
 					</div>
 				</div>
 				
-				{#if stats.musicStats.musicPlaybackBehavior}
-					<PlaybackBehaviorPieChart data={stats.musicStats.musicPlaybackBehavior} />
+				{#if stats.musicStats.musicPlaybackBehavior || stats.platformBreakdown}
+					<div class="row g-4 mb-4" style="display: flex; flex-wrap: wrap;">
+						{#if stats.musicStats.musicPlaybackBehavior}
+							<PlaybackBehaviorPieChart data={stats.musicStats.musicPlaybackBehavior} />
+						{/if}
+						{#if stats.platformBreakdown}
+							<PlatformPieChart data={stats.platformBreakdown} />
+						{/if}
+						{#if stats.musicStats.musicPlaybackBehavior}
+							<ShufflePieChart data={stats.musicStats.musicPlaybackBehavior} />
+						{/if}
+					</div>
 				{/if}
 				
 				{#if stats.musicStats.topMusicArtists && stats.musicStats.topMusicArtists.length > 0}

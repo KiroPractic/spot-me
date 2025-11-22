@@ -1,9 +1,8 @@
 import { authStore } from '$lib/stores/auth';
 import { browser } from '$app/environment';
 
-const API_BASE_URL = browser 
-	? (import.meta.env.VITE_API_URL || 'http://localhost:5002/api')
-	: 'http://localhost:5002/api';
+// Use environment variable if set, otherwise default to relative path for same-domain deployment
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 export interface ApiError {
 	message: string;

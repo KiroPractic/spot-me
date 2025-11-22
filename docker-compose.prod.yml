@@ -35,8 +35,17 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:8080
+      # Database connection
       - ConnectionStrings__Database=Host=postgres;Database=spotme_db;Username=spotme;Password=${POSTGRES_PASSWORD:-spotme_password};Port=5432
-      - Blazorise__ProductToken=${BLAZORISE_TOKEN}
+      # JWT Configuration (required)
+      - Jwt__SecretKey=${JWT_SECRET_KEY}
+      - Jwt__Issuer=${JWT_ISSUER:-SpotMe}
+      - Jwt__Audience=${JWT_AUDIENCE:-SpotMeUsers}
+      - Jwt__ExpirationMinutes=${JWT_EXPIRATION_MINUTES:-60}
+      # Spotify Configuration (required for Spotify integration)
+      - Spotify__ClientId=${SPOTIFY_CLIENT_ID}
+      - Spotify__ClientSecret=${SPOTIFY_CLIENT_SECRET}
+      - Spotify__RedirectUri=${SPOTIFY_REDIRECT_URI}
     depends_on:
       postgres:
         condition: service_healthy

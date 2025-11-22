@@ -106,6 +106,11 @@ export interface CountryStats {
 	uniqueArtists: number;
 }
 
+export interface PlatformBreakdown {
+	platformUsage: Record<string, number>;
+	platformMinutes: Record<string, number>;
+}
+
 export interface Stats {
 	totalMinutes: number;
 	totalTracks: number;
@@ -114,6 +119,8 @@ export interface Stats {
 	musicStats?: MusicStats;
 	timeBasedStats?: TimeBasedStats;
 	countryStats?: CountryStats[];
+	platformBreakdown?: PlatformBreakdown;
+	playbackBehavior?: PlaybackBehavior;
 }
 
 export interface StatsResponse {
