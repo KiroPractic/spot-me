@@ -58,14 +58,8 @@ jobs:
           # Create a deployment version of docker-compose.prod.yml with the image name
           IMAGE_NAME="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
           # Replace the placeholder image name with the actual image
+          # Docker Compose will automatically use 'image:' and ignore 'build:' when both are present
           sed -i.bak "s|# image: ghcr.io/YOUR_USERNAME/YOUR_REPO:latest|    image: ${IMAGE_NAME}|" docker-compose.prod.yml
-          # Comment out the build section (simple approach - comment lines with build, context, dockerfile, target)
-          sed -i.bak \
-            -e '/^[[:space:]]*build:/s/^/    # /' \
-            -e '/^[[:space:]]*context:/s/^/    # /' \
-            -e '/^[[:space:]]*dockerfile:/s/^/    # /' \
-            -e '/^[[:space:]]*target:/s/^/    # /' \
-            docker-compose.prod.yml
           rm -f docker-compose.prod.yml.bak
 
       - name: Copy docker-compose to VM

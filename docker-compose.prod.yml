@@ -26,10 +26,6 @@ services:
       - Jwt__Issuer=${JWT_ISSUER:-SpotMe}
       - Jwt__Audience=${JWT_AUDIENCE:-SpotMeUsers}
       - Jwt__ExpirationMinutes=${JWT_EXPIRATION_MINUTES:-60}
-      # Spotify Configuration (required for Spotify integration)
-      - Spotify__ClientId=${SPOTIFY_CLIENT_ID}
-      - Spotify__ClientSecret=${SPOTIFY_CLIENT_SECRET}
-      - Spotify__RedirectUri=${SPOTIFY_REDIRECT_URI}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
