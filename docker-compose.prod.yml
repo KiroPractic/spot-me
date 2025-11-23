@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # SpotMe Web Application (Production)
   app:
@@ -26,17 +24,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-    networks:
-      - spotme-network
-
-  # Cloudflare Tunnel
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: spotme-cloudflared
-    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
-    depends_on:
-      - app
-    restart: unless-stopped
     networks:
       - spotme-network
 
