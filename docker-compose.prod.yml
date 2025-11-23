@@ -27,6 +27,17 @@ services:
     networks:
       - spotme-network
 
+  # Cloudflare Tunnel
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: spotme-cloudflared
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - app
+    restart: unless-stopped
+    networks:
+      - spotme-network
+
 networks:
   spotme-network:
     driver: bridge
