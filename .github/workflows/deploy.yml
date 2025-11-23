@@ -53,16 +53,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Prepare docker-compose for deployment
-        run: |
-          # Create a deployment version of docker-compose.prod.yml with the image name
-          IMAGE_NAME="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
-          # Replace the placeholder image name with the actual image
-          sed -i.bak "s|# image: ghcr.io/YOUR_USERNAME/YOUR_REPO:latest|    image: ${IMAGE_NAME}|" docker-compose.prod.yml
-          # Remove the build section (lines 6-10: comment, build:, context:, dockerfile:, target:)
-          sed -i.bak '6,10d' docker-compose.prod.yml
-          rm -f docker-compose.prod.yml.bak
-
       - name: Copy docker-compose to VM
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -99,11 +89,6 @@ jobs:
             JWT_ISSUER=${{ secrets.JWT_ISSUER }}
             JWT_AUDIENCE=${{ secrets.JWT_AUDIENCE }}
             JWT_EXPIRATION_MINUTES=${{ secrets.JWT_EXPIRATION_MINUTES }}
-            
-            # Spotify API Configuration
-            SPOTIFY_CLIENT_ID=${{ secrets.SPOTIFY_CLIENT_ID }}
-            SPOTIFY_CLIENT_SECRET=${{ secrets.SPOTIFY_CLIENT_SECRET }}
-            SPOTIFY_REDIRECT_URI=${{ secrets.SPOTIFY_REDIRECT_URI }}
             
             # Cloudflare Tunnel Configuration
             CLOUDFLARE_TUNNEL_TOKEN=${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}

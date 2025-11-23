@@ -3,16 +3,10 @@ version: '3.8'
 services:
   # SpotMe Web Application (Production)
   app:
-    # Option 1: Build from source (for initial setup or local builds)
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: runtime
-    # Option 2: Use pre-built image from GitHub Container Registry (uncomment after first deployment)
-    # image: ghcr.io/YOUR_USERNAME/YOUR_REPO:latest
+    image: ghcr.io/kiropractic/spot-me:latest
     container_name: spotme-app-prod
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     volumes:
       - spotify_data:/app/SpotifyStats
       - user_data:/app/UserData
