@@ -76,7 +76,7 @@ jobs:
           key: ${{ secrets.VM_SSH_KEY }}
           port: ${{ secrets.VM_SSH_PORT || 22 }}
           source: "docker-compose.prod.yml"
-          target: "/opt/spotme/"
+          target: "~/spotme/"
 
       - name: Deploy to VM
         uses: appleboy/ssh-action@v1.0.3
@@ -87,7 +87,7 @@ jobs:
           port: ${{ secrets.VM_SSH_PORT || 22 }}
           script: |
             # Create deployment directory if it doesn't exist
-            DEPLOY_DIR="/opt/spotme"
+            DEPLOY_DIR="$HOME/spotme"
             mkdir -p $DEPLOY_DIR
             cd $DEPLOY_DIR
             
@@ -132,6 +132,6 @@ jobs:
           port: ${{ secrets.VM_SSH_PORT || 22 }}
           script: |
             sleep 10
-            cd /opt/spotme
+            cd ~/spotme
             docker compose -f docker-compose.prod.yml exec -T app curl -f http://localhost:8080/health || exit 1
 
