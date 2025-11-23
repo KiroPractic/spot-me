@@ -232,6 +232,169 @@ If using Docker on Azure Container Instances or Azure Container Apps:
 - All sensitive values should be stored in Azure App Settings, not in `appsettings.Production.json`
 - Database migrations are automatically applied on application startup
 
+## VM Deployment with Docker, Aiven Postgres, and Cloudflare Tunnel
+
+### Overview
+
+This deployment setup runs SpotMe on a VM using Docker, with Aiven PostgreSQL as the managed database and Cloudflare Tunnel for secure external access.
+
+### Prerequisites
+
+- VM with Docker and Docker Compose installed
+- Aiven PostgreSQL database instance
+- Cloudflare account with Zero Trust access
+- GitHub repository with Actions enabled
+
+### Step 1: Prepare Aiven PostgreSQL
+
+1. Create a PostgreSQL service in Aiven
+2. Note the connection details (host, port, database name, username, password)
+3. The connection string format should be:
+   ```
+   Host=<host>;Database=<db>;Username=<user>;Password=<pwd>;Port=<port>;Ssl Mode=Require
+   ```
+
+### Step 2: Set Up Cloudflare Tunnel
+
+1. Log in to [Cloudflare Zero Trust Dashboard](https://one.dash.cloudflare.com/)
+2. Navigate to **Zero Trust > Networks > Tunnels**
+3. Click **Create a tunnel**
+4. Select **Cloudflared** as the connector
+5. Give your tunnel a name (e.g., `spotme-tunnel`)
+6. Copy the tunnel token (you'll need this for the `.env.production` file)
+7. Configure the tunnel to route traffic:
+   - **Public hostname**: Your domain (e.g., `spotme.example.com`)
+   - **Service**: `http://localhost:8080` (or your app's internal port)
+
+### Step 3: Configure Environment Variables
+
+1. Copy `env.production.template` to `.env.production` on your VM
+2. Fill in all required values:
+   ```bash
+   # Aiven Database
+   AIVEN_DATABASE_CONNECTION_STRING=Host=your-db.aivencloud.com;Database=spotme_db;Username=avnadmin;Password=your_password;Port=12345;Ssl Mode=Require
+   
+   # JWT (generate a strong random string, minimum 32 characters)
+   JWT_SECRET_KEY=your-very-long-random-secret-key-here
+   
+   # Spotify API
+   SPOTIFY_CLIENT_ID=your_spotify_client_id
+   SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
+   SPOTIFY_REDIRECT_URI=https://your-domain.com/api/spotify/callback
+   
+   # Cloudflare Tunnel
+   CLOUDFLARE_TUNNEL_TOKEN=your_tunnel_token_from_cloudflare
+   ```
+
+### Step 4: Initial VM Setup
+
+1. Clone the repository on your VM:
+   ```bash
+   git clone <your-repo-url>
+   cd spot-me
+   ```
+
+2. Create the `.env.production` file as described above
+
+3. Create necessary directories:
+   ```bash
+   mkdir -p /opt/spotme
+   cp docker-compose.prod.yml /opt/spotme/
+   cp .env.production /opt/spotme/
+   cd /opt/spotme
+   ```
+
+4. Update `docker-compose.prod.yml` to use the image from GitHub Container Registry:
+   ```yaml
+   app:
+     # Replace YOUR_USERNAME and YOUR_REPO with your GitHub username and repository name
+     image: ghcr.io/YOUR_USERNAME/YOUR_REPO:latest
+     # Comment out or remove the build section when using pre-built images
+   ```
+   
+   **Note**: For the first deployment, you can build locally by keeping the `build:` section. After the GitHub Actions workflow builds and pushes the image, update the compose file to use the `image:` field instead.
+
+5. Start the services:
+   ```bash
+   docker compose -f docker-compose.prod.yml up -d
+   ```
+
+6. Verify the deployment:
+   ```bash
+   docker compose -f docker-compose.prod.yml ps
+   docker compose -f docker-compose.prod.yml logs -f
+   ```
+
+### Step 5: Configure GitHub Actions
+
+1. Go to your GitHub repository **Settings > Secrets and variables > Actions**
+
+2. Add the following secrets:
+   - **`VM_HOST`**: Your VM's IP address or hostname
+   - **`VM_USERNAME`**: SSH username for your VM
+   - **`VM_SSH_KEY`**: Private SSH key for authentication (the entire key, including `-----BEGIN` and `-----END` lines)
+   - **`VM_SSH_PORT`**: SSH port (optional, defaults to 22)
+
+3. The workflow will automatically:
+   - Build the Docker image on every push to `main`
+   - Push to GitHub Container Registry
+   - SSH into your VM and pull the new image
+   - Restart the application container
+
+### Step 6: Manual Deployment (Alternative)
+
+If you prefer manual deployment:
+
+```bash
+# On your VM
+cd /opt/spotme
+docker compose -f docker-compose.prod.yml pull app
+docker compose -f docker-compose.prod.yml up -d --no-deps app
+docker compose -f docker-compose.prod.yml logs -f app
+```
+
+### Troubleshooting
+
+#### Application won't start
+- Check logs: `docker compose -f docker-compose.prod.yml logs app`
+- Verify database connection string format
+- Ensure all environment variables are set
+
+#### Cloudflare Tunnel not connecting
+- Verify tunnel token is correct
+- Check Cloudflare dashboard for tunnel status
+- View tunnel logs: `docker compose -f docker-compose.prod.yml logs cloudflared`
+
+#### Database connection issues
+- Verify Aiven database is running and accessible
+- Check SSL mode is set to `Require` in connection string
+- Ensure firewall rules allow connection from your VM's IP
+
+#### GitHub Actions deployment fails
+- Verify SSH key has correct permissions
+- Check VM is accessible from the internet
+- Review GitHub Actions logs for specific errors
+
+### Updating the Application
+
+The GitHub Actions workflow automatically deploys on every push to `main`. For manual updates:
+
+```bash
+# Pull latest code
+git pull origin main
+
+# Rebuild and restart
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+### Security Notes
+
+- Never commit `.env.production` to version control
+- Use strong, unique passwords and secrets
+- Keep your VM and Docker images updated
+- Regularly rotate JWT secret keys and database passwords
+- Monitor Cloudflare tunnel logs for suspicious activity
+
 ## Additional Documentation
 
 - **HOW_TO_RUN.md**: Detailed setup instructions (legacy, now using Docker)

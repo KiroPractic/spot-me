@@ -1,0 +1,20 @@
+# Cloudflare Tunnel Configuration Template
+# This file is used if you prefer config file over token-based authentication
+# Copy to cloudflare-tunnel-config.yml and update with your values
+# 
+# To use this instead of TUNNEL_TOKEN:
+# 1. Mount this file as a volume: - ./cloudflare-tunnel-config.yml:/etc/cloudflared/config.yml
+# 2. Change command to: tunnel --config /etc/cloudflared/config.yml run
+
+tunnel: YOUR_TUNNEL_ID
+credentials-file: /etc/cloudflared/credentials.json
+
+ingress:
+  # Route all traffic to the SpotMe app
+  # Use 'app:8080' when running in Docker (service name)
+  # Use 'localhost:8080' when running on host
+  - hostname: your-domain.com
+    service: http://app:8080
+  # Catch-all rule (must be last)
+  - service: http_status:404
+

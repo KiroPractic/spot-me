@@ -1,42 +1,26 @@
 version: '3.8'
 
 services:
-  # PostgreSQL database
-  postgres:
-    image: postgres:15
-    container_name: spotme-postgres-prod
-    environment:
-      POSTGRES_USER: spotme
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-spotme_password}
-      POSTGRES_DB: spotme_db
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U spotme -d spotme_db"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
   # SpotMe Web Application (Production)
   app:
+    # Option 1: Build from source (for initial setup or local builds)
     build:
       context: .
       dockerfile: Dockerfile
       target: runtime
+    # Option 2: Use pre-built image from GitHub Container Registry (uncomment after first deployment)
+    # image: ghcr.io/YOUR_USERNAME/YOUR_REPO:latest
     container_name: spotme-app-prod
     ports:
-      - "80:8080"
+      - "8080:8080"
     volumes:
       - spotify_data:/app/SpotifyStats
       - user_data:/app/UserData
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:8080
-      # Database connection
-      - ConnectionStrings__Database=Host=postgres;Database=spotme_db;Username=spotme;Password=${POSTGRES_PASSWORD:-spotme_password};Port=5432
+      # Database connection - Aiven Postgres (set via .env file)
+      - ConnectionStrings__Database=${AIVEN_DATABASE_CONNECTION_STRING}
       # JWT Configuration (required)
       - Jwt__SecretKey=${JWT_SECRET_KEY}
       - Jwt__Issuer=${JWT_ISSUER:-SpotMe}
@@ -46,17 +30,30 @@ services:
       - Spotify__ClientId=${SPOTIFY_CLIENT_ID}
       - Spotify__ClientSecret=${SPOTIFY_CLIENT_SECRET}
       - Spotify__RedirectUri=${SPOTIFY_REDIRECT_URI}
-    depends_on:
-      postgres:
-        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+    networks:
+      - spotme-network
+
+  # Cloudflare Tunnel
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: spotme-cloudflared
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - app
+    restart: unless-stopped
+    networks:
+      - spotme-network
+
+networks:
+  spotme-network:
+    driver: bridge
 
 volumes:
-  postgres_data:
   spotify_data:
   user_data: 
