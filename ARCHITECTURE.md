@@ -1,8 +1,8 @@
-# SpotMe Architecture
+# SpotATrend Architecture
 
 ## Overview
 
-SpotMe is now a **separated frontend/backend application**:
+SpotATrend is now a **separated frontend/backend application**:
 
 - **Backend**: ASP.NET Core API (FastEndpoints)
 - **Frontend**: SvelteKit application
@@ -10,14 +10,14 @@ SpotMe is now a **separated frontend/backend application**:
 ## Directory Structure
 
 ```
-spot-me/
+spot-a-trend/
 ├── Source/
-│   └── SpotMe.Web/          # Backend API
+│   └── SpotATrend.Web/          # Backend API
 │       ├── wwwroot/         # Static assets only (favicon, images)
 │       ├── Endpoints/        # API endpoints
 │       └── Program.cs       # Backend configuration
 │
-└── spotme-frontend/         # Frontend SvelteKit app
+└── spotatrend-frontend/         # Frontend SvelteKit app
     ├── src/
     │   ├── routes/          # SvelteKit routes (pages)
     │   ├── lib/             # Shared components and utilities
@@ -76,7 +76,7 @@ spot-me/
 The old HTMX files have been removed:
 - ❌ `wwwroot/*.html` (migrated to SvelteKit routes)
 - ❌ `wwwroot/js/*.js` (migrated to SvelteKit components)
-- ❌ `wwwroot/app.css` (moved to `spotme-frontend/src/app.css`)
+- ❌ `wwwroot/app.css` (moved to `spotatrend-frontend/src/app.css`)
 - ✅ `wwwroot/favicon.png` (kept for static assets)
 - ✅ `wwwroot/images/` (kept for static assets)
 

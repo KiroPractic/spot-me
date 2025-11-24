@@ -3,13 +3,13 @@ FROM node:20 AS frontend-build
 WORKDIR /app/frontend
 
 # Copy frontend package files
-COPY spotme-frontend/package*.json ./
+COPY spotatrend-frontend/package*.json ./
 
 # Install dependencies
 RUN npm ci
 
 # Copy frontend source
-COPY spotme-frontend/ .
+COPY spotatrend-frontend/ .
 
 # Build frontend
 RUN npm run build
@@ -19,23 +19,23 @@ FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
 # Copy project files
-COPY Source/SpotMe.Model/SpotMe.Model.csproj SpotMe.Model/
-COPY Source/SpotMe.Web/SpotMe.Web.csproj SpotMe.Web/
+COPY Source/SpotATrend.Model/SpotATrend.Model.csproj SpotATrend.Model/
+COPY Source/SpotATrend.Web/SpotATrend.Web.csproj SpotATrend.Web/
 
 # Restore dependencies
-RUN dotnet restore SpotMe.Web/SpotMe.Web.csproj
+RUN dotnet restore SpotATrend.Web/SpotATrend.Web.csproj
 
 # Copy source code
 COPY Source/ .
 
 # Copy frontend build output to wwwroot
-COPY --from=frontend-build /app/frontend/build ./SpotMe.Web/wwwroot/
+COPY --from=frontend-build /app/frontend/build ./SpotATrend.Web/wwwroot/
 
 # Build the application
-RUN dotnet build SpotMe.Web/SpotMe.Web.csproj -c Release -o /app/build
+RUN dotnet build SpotATrend.Web/SpotATrend.Web.csproj -c Release -o /app/build
 
 # Publish the application
-RUN dotnet publish SpotMe.Web/SpotMe.Web.csproj -c Release -o /app/publish
+RUN dotnet publish SpotATrend.Web/SpotATrend.Web.csproj -c Release -o /app/publish
 
 # Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
@@ -48,15 +48,15 @@ RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 COPY --from=build /app/publish .
 
 # Copy SpotifyStats directory
-COPY Source/SpotMe.Web/SpotifyStats ./SpotifyStats/
+COPY Source/SpotATrend.Web/SpotifyStats ./SpotifyStats/
 
 # Create UserData directory
 RUN mkdir -p ./UserData
 
 # Create non-root user
-RUN groupadd -r spotme && useradd -r -g spotme spotme
-RUN chown -R spotme:spotme /app
-USER spotme
+RUN groupadd -r spotatrend && useradd -r -g spotatrend spotatrend
+RUN chown -R spotatrend:spotatrend /app
+USER spotatrend
 
 # Expose port
 EXPOSE 8080
@@ -66,4 +66,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8080/health || exit 1
 
 # Entry point
-ENTRYPOINT ["dotnet", "SpotMe.Web.dll"] 
+ENTRYPOINT ["dotnet", "SpotATrend.Web.dll"] 

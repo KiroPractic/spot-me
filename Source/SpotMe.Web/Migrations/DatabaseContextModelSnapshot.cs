@@ -4,11 +4,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
-using SpotMe.Web.Persistency;
+using SpotATrend.Web.Persistency;
 
 #nullable disable
 
-namespace SpotMe.Web.Migrations
+namespace SpotATrend.Web.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
     partial class DatabaseContextModelSnapshot : ModelSnapshot
@@ -22,47 +22,7 @@ namespace SpotMe.Web.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("SpotMe.Web.Domain.UploadedFile", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedOn")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("FileHash")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.Property<string>("FileName")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<long>("FileSize")
-                        .HasColumnType("bigint");
-
-                    b.Property<DateTime>("UploadedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId")
-                        .HasDatabaseName("IX_UploadedFiles_UserId");
-
-                    b.HasIndex("UserId", "FileHash")
-                        .IsUnique()
-                        .HasDatabaseName("IX_UploadedFiles_User_FileHash_Unique");
-
-                    b.ToTable("UploadedFiles", (string)null);
-                });
-
-            modelBuilder.Entity("SpotMe.Web.Domain.Users.SpotifyToken", b =>
+            modelBuilder.Entity("SpotATrend.Web.Domain.Users.SpotifyToken", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -97,7 +57,7 @@ namespace SpotMe.Web.Migrations
                     b.ToTable("SpotifyTokens");
                 });
 
-            modelBuilder.Entity("SpotMe.Web.Domain.Users.User", b =>
+            modelBuilder.Entity("SpotATrend.Web.Domain.Users.User", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -124,7 +84,7 @@ namespace SpotMe.Web.Migrations
                     b.ToTable("Users");
                 });
 
-            modelBuilder.Entity("SpotMe.Web.Services.StreamingHistoryEntry", b =>
+            modelBuilder.Entity("SpotATrend.Web.Services.StreamingHistoryEntry", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -194,9 +154,6 @@ namespace SpotMe.Web.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
-                    b.Property<Guid>("UploadedFileId")
-                        .HasColumnType("uuid");
-
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
 
@@ -205,9 +162,6 @@ namespace SpotMe.Web.Migrations
                     b.HasIndex("SpotifyUri")
                         .HasDatabaseName("IX_StreamingHistory_SpotifyUri")
                         .HasFilter("\"SpotifyUri\" IS NOT NULL");
-
-                    b.HasIndex("UploadedFileId")
-                        .HasDatabaseName("IX_StreamingHistory_UploadedFileId");
 
                     b.HasIndex("UserId", "ArtistName", "PlayedAt")
                         .HasDatabaseName("IX_StreamingHistory_User_Artist_PlayedAt")
@@ -223,24 +177,58 @@ namespace SpotMe.Web.Migrations
                     b.ToTable("StreamingHistory", (string)null);
                 });
 
-            modelBuilder.Entity("SpotMe.Web.Domain.Users.SpotifyToken", b =>
+            modelBuilder.Entity("SpotATrend.Web.Domain.UploadedFile", b =>
                 {
-                    b.HasOne("SpotMe.Web.Domain.Users.User", "User")
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("EntryCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("FileHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<long>("FileSize")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("IX_UploadedFiles_UserId");
+
+                    b.HasIndex("UserId", "FileHash")
+                        .IsUnique()
+                        .HasDatabaseName("IX_UploadedFiles_User_FileHash_Unique");
+
+                    b.ToTable("UploadedFiles", (string)null);
+                });
+
+            modelBuilder.Entity("SpotATrend.Web.Domain.Users.SpotifyToken", b =>
+                {
+                    b.HasOne("SpotATrend.Web.Domain.Users.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("User");
-                });
-
-            modelBuilder.Entity("SpotMe.Web.Services.StreamingHistoryEntry", b =>
-                {
-                    b.HasOne("SpotMe.Web.Domain.UploadedFile", null)
-                        .WithMany()
-                        .HasForeignKey("UploadedFileId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

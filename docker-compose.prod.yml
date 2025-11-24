@@ -1,8 +1,8 @@
 services:
-  # SpotMe Web Application (Production)
+  # SpotATrend Web Application (Production)
   app:
-    image: ghcr.io/kiropractic/spot-me:latest
-    container_name: spotme-app-prod
+    image: ghcr.io/kiropractic/spot-a-trend:latest
+    container_name: spotatrend-app-prod
     ports:
       - "127.0.0.1:8080:8080"
     volumes:
@@ -15,8 +15,8 @@ services:
       - ConnectionStrings__Database=${AIVEN_DATABASE_CONNECTION_STRING}
       # JWT Configuration (required)
       - Jwt__SecretKey=${JWT_SECRET_KEY}
-      - Jwt__Issuer=${JWT_ISSUER:-SpotMe}
-      - Jwt__Audience=${JWT_AUDIENCE:-SpotMeUsers}
+      - Jwt__Issuer=${JWT_ISSUER:-SpotATrend}
+      - Jwt__Audience=${JWT_AUDIENCE:-SpotATrendUsers}
       - Jwt__ExpirationMinutes=${JWT_EXPIRATION_MINUTES:-60}
     restart: unless-stopped
     healthcheck:
@@ -25,21 +25,21 @@ services:
       timeout: 10s
       retries: 3
     networks:
-      - spotme-network
+      - spotatrend-network
 
   # Cloudflare Tunnel
   cloudflared:
     image: cloudflare/cloudflared:latest
-    container_name: spotme-cloudflared
+    container_name: spotatrend-cloudflared
     command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
     depends_on:
       - app
     restart: unless-stopped
     networks:
-      - spotme-network
+      - spotatrend-network
 
 networks:
-  spotme-network:
+  spotatrend-network:
     driver: bridge
 
 volumes:

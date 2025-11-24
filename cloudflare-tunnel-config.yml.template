@@ -10,7 +10,7 @@ tunnel: YOUR_TUNNEL_ID
 credentials-file: /etc/cloudflared/credentials.json
 
 ingress:
-  # Route all traffic to the SpotMe app
+  # Route all traffic to the SpotATrend app
   # Use 'app:8080' when running in Docker (service name)
   # Use 'localhost:8080' when running on host
   - hostname: your-domain.com

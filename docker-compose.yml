@@ -1,28 +1,27 @@
-version: '3.8'
-
 services:
   # PostgreSQL database
   postgres:
     image: postgres:15
-    container_name: spotme-postgres
+    container_name: spotatrend-postgres
     environment:
-      POSTGRES_USER: spotme
-      POSTGRES_PASSWORD: spotme_password
-      POSTGRES_DB: spotme_db
+      POSTGRES_USER: spotatrend
+      POSTGRES_PASSWORD: spotatrend_password
+      POSTGRES_DB: spotatrend_db
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U spotme -d spotme_db"]
+      test: ["CMD-SHELL", "pg_isready -U spotatrend -d spotatrend_db"]
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
   # SMTP server for development
   smtp4dev:
     image: rnwood/smtp4dev
-    container_name: spotme-smtp4dev
+    container_name: spotatrend-smtp4dev
     ports:
       - "3000:80"
       - "25:25"
@@ -31,35 +30,35 @@ services:
     volumes:
       - smtp4dev_data:/smtp4dev
 
-  # SpotMe Web Application (Development with hot reload)
+  # SpotATrend Web Application (Development with hot reload)
   app:
     image: mcr.microsoft.com/dotnet/sdk:8.0
-    container_name: spotme-app-dev
+    container_name: spotatrend-app-dev
     volumes:
       - ./Source:/src
-      - /src/SpotMe.Web/bin
-      - /src/SpotMe.Web/obj
-      - spotify_data:/src/SpotMe.Web/SpotifyStats
-      - user_data:/src/SpotMe.Web/UserData
+      - /src/SpotATrend.Web/bin
+      - /src/SpotATrend.Web/obj
+      - spotify_data:/src/SpotATrend.Web/SpotifyStats
+      - user_data:/src/SpotATrend.Web/UserData
     working_dir: /src
     ports:
       - "5000:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:8080
-      - ConnectionStrings__Database=Host=postgres;Database=spotme_db;Username=spotme;Password=spotme_password;Port=5432
+      - ConnectionStrings__Database=Host=postgres;Database=spotatrend_db;Username=spotatrend;Password=spotatrend_password;Port=5432
     depends_on:
       postgres:
         condition: service_healthy
-    command: dotnet watch run --project SpotMe.Web/SpotMe.Web.csproj --urls http://0.0.0.0:8080
+    command: dotnet watch run --project SpotATrend.Web/SpotATrend.Web.csproj --urls http://0.0.0.0:8080
 
   # Frontend (SvelteKit with hot reload)
   frontend:
     image: node:20
-    container_name: spotme-frontend-dev
+    container_name: spotatrend-frontend-dev
     working_dir: /app
     volumes:
-      - ./spotme-frontend:/app
+      - ./spotatrend-frontend:/app
       - /app/node_modules
     ports:
       - "5173:5173"
@@ -73,7 +72,7 @@ services:
   # File Browser - Web UI to browse uploaded files
   filebrowser:
     image: filebrowser/filebrowser:latest
-    container_name: spotme-filebrowser
+    container_name: spotatrend-filebrowser
     ports:
       - "8081:80"
     volumes:
