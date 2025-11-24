@@ -138,7 +138,8 @@
 						<h4 class="h5 mb-3">Request Your Data</h4>
 						<p class="text-muted">
 							Visit Spotify's privacy settings and request your extended streaming history. 
-							Spotify will email you a download link within a few days.
+							Spotify will first send a confirmation email - make sure to confirm your request. 
+							Then you'll receive a download link within a few days.
 						</p>
 					</div>
 				</div>

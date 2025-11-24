@@ -5,8 +5,6 @@
 	import { dataApi, type FileInfo } from '$lib/api/data';
 	import { type ApiError } from '$lib/api/client';
 	
-	export let params: Record<string, string> = {};
-	
 	let files: FileInfo[] = [];
 	let loading = true;
 	let uploading = false;
@@ -150,9 +148,14 @@
 						Scroll down to "Download your data" and click "Request data". Select "Extended streaming history" and submit your request.
 					</li>
 					<li>
-						<strong>Wait for Email:</strong>
+						<strong>Confirm Your Request via Email:</strong>
 						<br>
-						Spotify will email you (usually within a few days) with a link to download your data as a ZIP file.
+						Spotify will first send you a confirmation email. You must click the confirmation link in that email to verify that you requested the data.
+					</li>
+					<li>
+						<strong>Wait for Data Email:</strong>
+						<br>
+						After confirming, Spotify will email you (usually within a few days) with a link to download your data as a ZIP file.
 					</li>
 					<li>
 						<strong>Extract and Upload:</strong>
