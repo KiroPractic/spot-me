@@ -30,7 +30,7 @@
 			goto('/data');
 		} catch (err) {
 			const apiError = err as ApiError;
-			error = apiError.message || 'Invalid email or password';
+			error = apiError.message || 'Your credentials are incorrect. Please try again.';
 		} finally {
 			loading = false;
 		}

@@ -30,11 +30,7 @@
 			goto('/data');
 		} catch (err) {
 			const apiError = err as ApiError;
-			if (apiError.status === 409) {
-				error = 'A user with this email already exists';
-			} else {
-				error = apiError.message || 'Registration failed. Please check your input.';
-			}
+			error = apiError.message || 'Registration failed. Please check your input.';
 		} finally {
 			loading = false;
 		}

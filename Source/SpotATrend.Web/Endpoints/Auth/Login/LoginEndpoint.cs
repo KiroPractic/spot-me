@@ -35,7 +35,7 @@ public class LoginEndpoint : Endpoint<LoginRequest, LoginResponse>
 
         if (user == null || !_passwordHashingService.VerifyPassword(req.Password, user.PasswordHash))
         {
-            await SendUnauthorizedAsync(ct);
+            await SendAsync(new { message = "Your credentials are incorrect. Please try again." }, 401, ct);
             return;
         }
 
