@@ -16,6 +16,8 @@ export interface ArtistStats {
 	uniqueTracks: number;
 	uniqueAlbums: number;
 	primaryContentType: string;
+	skipCount?: number;
+	skipScore?: number;
 }
 
 export interface TrackStats {
@@ -28,6 +30,8 @@ export interface TrackStats {
 	contentType: string;
 	averagePlayDuration: number;
 	mostCommonCompletionStatus: string;
+	skipCount?: number;
+	skipScore?: number;
 }
 
 export interface AlbumStats {
@@ -60,6 +64,8 @@ export interface MusicStats {
 	topMusicArtists?: ArtistStats[];
 	topMusicTracks?: TrackStats[];
 	topMusicAlbums?: AlbumStats[];
+	topSkippedMusicTracks?: TrackStats[];
+	topSkippedMusicArtists?: ArtistStats[];
 	musicPlaybackBehavior?: PlaybackBehavior;
 }
 

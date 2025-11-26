@@ -223,6 +223,8 @@ public class ArtistStats
     public int UniqueTracks { get; set; }
     public int UniqueAlbums { get; set; }
     public ContentType PrimaryContentType { get; set; }
+    public int SkipCount { get; set; }
+    public double SkipScore { get; set; }
 }
 
 public class TrackStats
@@ -236,6 +238,8 @@ public class TrackStats
     public ContentType ContentType { get; set; }
     public double AveragePlayDuration { get; set; }
     public PlaybackCompletionStatus MostCommonCompletionStatus { get; set; }
+    public int SkipCount { get; set; }
+    public double SkipScore { get; set; }
 }
 
 public class AlbumStats

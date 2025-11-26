@@ -361,6 +361,71 @@ public class DatabaseStatsService
                 .Take(50)
                 .ToListAsync();
 
+            // Most skipped music tracks - using skip percentage
+            var skippedTracksQuery = musicQuery
+                .Where(sh => sh.TrackName != null && sh.ArtistName != null)
+                .GroupBy(sh => new { sh.ArtistName, sh.TrackName })
+                .Select(g => new
+                {
+                    ArtistName = g.Key.ArtistName!,
+                    TrackName = g.Key.TrackName!,
+                    PlayCount = g.Count(),
+                    SkipCount = g.Count(x => x.Skipped == true),
+                    AlbumName = g.Select(x => x.AlbumName).FirstOrDefault(),
+                    SpotifyUri = g.Select(x => x.SpotifyUri).FirstOrDefault(),
+                    TotalMinutes = g.Sum(x => x.MsPlayed) / 60000.0,
+                    AveragePlayDuration = g.Average(x => x.MsPlayed) / 60000.0
+                })
+                .Where(x => x.PlayCount >= 5 && x.SkipCount >= 1) // Minimum 5 listens and at least 1 skip
+                .Select(x => new TrackStats
+                {
+                    ArtistName = x.ArtistName,
+                    TrackName = x.TrackName,
+                    AlbumName = x.AlbumName,
+                    SpotifyUri = x.SpotifyUri,
+                    PlayCount = x.PlayCount,
+                    SkipCount = x.SkipCount,
+                    SkipScore = (double)x.SkipCount / x.PlayCount * 100.0, // Skip percentage
+                    TotalMinutes = x.TotalMinutes,
+                    ContentType = ContentType.AudioTrack,
+                    AveragePlayDuration = x.AveragePlayDuration,
+                    MostCommonCompletionStatus = PlaybackCompletionStatus.Unknown
+                })
+                .OrderByDescending(t => t.SkipScore)
+                .Take(50);
+
+            musicStats.TopSkippedMusicTracks = await skippedTracksQuery.ToListAsync();
+
+            // Most skipped music artists - using skip percentage
+            var skippedArtistsQuery = musicQuery
+                .Where(sh => sh.ArtistName != null)
+                .GroupBy(sh => sh.ArtistName)
+                .Select(g => new
+                {
+                    ArtistName = g.Key!,
+                    PlayCount = g.Count(),
+                    SkipCount = g.Count(x => x.Skipped == true),
+                    TotalMinutes = g.Sum(x => x.MsPlayed) / 60000.0,
+                    UniqueTracks = g.Select(x => x.TrackName).Distinct().Count(),
+                    UniqueAlbums = g.Where(x => x.AlbumName != null).Select(x => x.AlbumName).Distinct().Count()
+                })
+                .Where(x => x.PlayCount >= 5 && x.SkipCount >= 1) // Minimum 5 listens and at least 1 skip
+                .Select(x => new ArtistStats
+                {
+                    ArtistName = x.ArtistName,
+                    PlayCount = x.PlayCount,
+                    SkipCount = x.SkipCount,
+                    SkipScore = (double)x.SkipCount / x.PlayCount * 100.0, // Skip percentage
+                    TotalMinutes = x.TotalMinutes,
+                    UniqueTracks = x.UniqueTracks,
+                    UniqueAlbums = x.UniqueAlbums,
+                    PrimaryContentType = ContentType.AudioTrack
+                })
+                .OrderByDescending(a => a.SkipScore)
+                .Take(50);
+
+            musicStats.TopSkippedMusicArtists = await skippedArtistsQuery.ToListAsync();
+
             // Music playback behavior - skipped vs not skipped
             var totalMusicPlays = await musicQuery.CountAsync();
             var skippedPlays = await musicQuery.Where(x => x.Skipped == true).CountAsync();

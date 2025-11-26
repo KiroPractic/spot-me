@@ -440,6 +440,64 @@
 						</table>
 					</div>
 				{/if}
+				
+				{#if stats.musicStats.topSkippedMusicTracks && stats.musicStats.topSkippedMusicTracks.length > 0}
+					<h3 class="mb-3 mt-5">Most Skipped Songs</h3>
+					<div class="table-responsive">
+						<table class="table table-hover table-dark">
+							<thead>
+								<tr>
+									<th scope="col" class="text-center">#</th>
+									<th scope="col">Song</th>
+									<th scope="col">Artist</th>
+									<th scope="col" class="text-center">Skip Count</th>
+									<th scope="col" class="text-center">Total Listens</th>
+									<th scope="col" class="text-center">Skip %</th>
+								</tr>
+							</thead>
+							<tbody>
+								{#each stats.musicStats.topSkippedMusicTracks as track, index}
+									<tr>
+										<td class="text-muted text-center">{index + 1}</td>
+										<td><strong>{track.trackName}</strong></td>
+										<td>{track.artistName}</td>
+										<td class="text-center">{track.skipCount?.toLocaleString() ?? 0}</td>
+										<td class="text-center">{track.playCount.toLocaleString()}</td>
+										<td class="text-center">{track.skipScore?.toFixed(1) ?? '0.0'}%</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+				{/if}
+				
+				{#if stats.musicStats.topSkippedMusicArtists && stats.musicStats.topSkippedMusicArtists.length > 0}
+					<h3 class="mb-3 mt-5">Most Skipped Artists</h3>
+					<div class="table-responsive">
+						<table class="table table-hover table-dark">
+							<thead>
+								<tr>
+									<th scope="col" class="text-center">#</th>
+									<th scope="col">Artist</th>
+									<th scope="col" class="text-center">Skip Count</th>
+									<th scope="col" class="text-center">Total Listens</th>
+									<th scope="col" class="text-center">Skip %</th>
+								</tr>
+							</thead>
+							<tbody>
+								{#each stats.musicStats.topSkippedMusicArtists as artist, index}
+									<tr>
+										<td class="text-muted text-center">{index + 1}</td>
+										<td><strong>{artist.artistName}</strong></td>
+										<td class="text-center">{artist.skipCount?.toLocaleString() ?? 0}</td>
+										<td class="text-center">{artist.playCount.toLocaleString()}</td>
+										<td class="text-center">{artist.skipScore?.toFixed(1) ?? '0.0'}%</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+				{/if}
 			{/if}
 		</div>
 		{/key}
