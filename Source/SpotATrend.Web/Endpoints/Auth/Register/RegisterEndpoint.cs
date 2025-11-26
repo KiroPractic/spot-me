@@ -35,7 +35,7 @@ public class RegisterEndpoint : Endpoint<RegisterRequest, RegisterResponse>
         // Validate email format
         if (!IsValidEmail(req.Email))
         {
-            await SendAsync(new { message = "Invalid email format. Please enter a valid email address." }, 400, ct);
+            await SendAsync(new RegisterResponse { Message = "Invalid email format. Please enter a valid email address." }, 400, ct);
             return;
         }
 
@@ -43,7 +43,7 @@ public class RegisterEndpoint : Endpoint<RegisterRequest, RegisterResponse>
         var passwordValidation = ValidatePassword(req.Password);
         if (!passwordValidation.IsValid)
         {
-            await SendAsync(new { message = passwordValidation.Message }, 400, ct);
+            await SendAsync(new RegisterResponse { Message = passwordValidation.Message }, 400, ct);
             return;
         }
 
@@ -53,7 +53,7 @@ public class RegisterEndpoint : Endpoint<RegisterRequest, RegisterResponse>
 
         if (existingUser != null)
         {
-            await SendAsync(new { message = "A user with this email already exists. Please use a different email or sign in." }, 409, ct);
+            await SendAsync(new RegisterResponse { Message = "A user with this email already exists. Please use a different email or sign in." }, 409, ct);
             return;
         }
 
