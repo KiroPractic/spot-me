@@ -99,8 +99,10 @@ jobs:
             # Pull the latest image (only works if docker-compose.prod.yml uses 'image:' not 'build:')
             docker compose -f docker-compose.prod.yml pull app 2>/dev/null || echo "Note: Using local build or image not configured in compose file"
             
-            # Restart all services to pick up any environment variable changes
-            docker compose -f docker-compose.prod.yml up -d
+            # Restart all services with force recreate to ensure new image is used
+            # --force-recreate: Recreate containers even if config hasn't changed (ensures new image is used)
+            # --remove-orphans: Remove containers for services not defined in the compose file
+            docker compose -f docker-compose.prod.yml up -d --force-recreate --remove-orphans
             docker compose -f docker-compose.prod.yml ps
 
       - name: Verify deployment
